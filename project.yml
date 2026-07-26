@@ -1,0 +1,80 @@
+name: AIUsage
+options:
+  bundleIdPrefix: com.zhange
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+targets:
+  AIUsage:
+    type: application
+    platform: macOS
+    sources:
+      - Shared
+      - macOS
+    info:
+      path: macOS/Info.plist
+      properties:
+        CFBundleDisplayName: AI 用量
+        LSUIElement: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zhange.aiusage
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  AIUsageiOS:
+    type: application
+    platform: iOS
+    sources:
+      - Shared
+      - iOS
+    dependencies:
+      - target: AIUsageWidget
+    entitlements:
+      path: iOS/AIUsageiOS.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.zhange.aiusage
+    info:
+      path: iOS/Info.plist
+      properties:
+        CFBundleDisplayName: AI 用量
+        UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: 用于在局域网内连接 Mac 上的「AI 用量」应用同步用量数据
+        NSBonjourServices:
+          - _aiusage._tcp
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zhange.aiusage.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  AIUsageWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Shared
+      - Widget
+    entitlements:
+      path: Widget/AIUsageWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.zhange.aiusage
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: AI 用量小组件
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zhange.aiusage.ios.widget
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES

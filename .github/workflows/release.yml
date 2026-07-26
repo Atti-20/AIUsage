@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS + iOS
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build macOS app
+        run: >
+          xcodebuild -project AIUsage.xcodeproj -scheme AIUsage
+          -configuration Release -derivedDataPath build
+          CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO build
+      - name: Package macOS dmg & zip
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/Build/Products/Release/AIUsage.app dist/AIUsage-macOS.zip
+          hdiutil create -volname "AI Usage" -srcfolder build/Build/Products/Release/AIUsage.app -ov -format UDZO dist/AIUsage-macOS.dmg
+      - name: Build iOS app (unsigned, for sideloading)
+        run: |
+          xcodebuild -project AIUsage.xcodeproj -scheme AIUsageiOS \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build-ios CODE_SIGNING_ALLOWED=NO build
+          mkdir -p Payload
+          cp -R build-ios/Build/Products/Release-iphoneos/AIUsageiOS.app Payload/
+          zip -qry dist/AIUsage-iOS-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build Windows app
+        run: flutter build windows --release
+        working-directory: flutter
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path flutter\build\windows\x64\runner\Release\* -DestinationPath dist\AIUsage-Windows-portable.zip
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build APK
+        run: flutter build apk --release
+        working-directory: flutter
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp flutter/build/app/outputs/flutter-apk/app-release.apk dist/AIUsage-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+
+  release:
+    name: Publish release
+    needs: [macos, windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

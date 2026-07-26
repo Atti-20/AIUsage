@@ -1,0 +1,18 @@
+# Xcode / Swift
+build/
+build-ios/
+dist/
+*.xcodeproj
+DerivedData/
+.DS_Store
+
+# Flutter / Dart
+flutter/build/
+flutter/.dart_tool/
+flutter/.idea/
+flutter/*.iml
+flutter/windows/flutter/ephemeral/
+flutter/android/.gradle/
+flutter/android/local.properties
+flutter/.flutter-plugins*
+flutter/.metadata
