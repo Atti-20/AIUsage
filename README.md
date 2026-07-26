@@ -1,47 +1,71 @@
 # AI 用量（AIUsage）
 
-Mac 菜单栏 + iOS App/小组件，查看 Claude Code 与 Codex 的用量、成本与官方限额，并集成 [codex-resets.com](https://codex-resets.com/) 的限额重置动态。**不需要付费开发者账号**：iPhone 同步走局域网（Bonjour 自动发现），免费 Apple ID 即可真机安装。
+跨平台查看 **Claude Code 与 Codex** 的用量、成本与官方限额，并集成 [codex-resets.com](https://codex-resets.com/) 的限额重置动态。
+
+| 平台 | 形态 | 技术 | 数据来源 |
+|---|---|---|---|
+| macOS 14+ | 菜单栏常驻 + 统计主窗口 | SwiftUI | 本地解析 + 局域网服务端 |
+| iOS 17+ | App + 桌面小组件 | SwiftUI + WidgetKit | 局域网同步 |
+| Windows 10+ | 桌面窗口应用 | Flutter | 本地解析 + 局域网服务端 |
+| Android 8+ | App | Flutter | 局域网同步 |
+
+**不需要付费开发者账号**：iPhone 同步走局域网（Bonjour/UDP 自动发现），免费 Apple ID 即可真机安装。
 
 ## 功能
 
-- **Mac 菜单栏常驻**：今日成本 + 关键限额环一眼可见；主窗口含总览 / Claude / Codex / 重置动态 / 设置五个页面。
-- **官方限额**（与 App 内显示一致）：
-  - Claude：读取钥匙串中 Claude Code 的 OAuth 令牌，调用 `api.anthropic.com/api/oauth/usage` 获取 5 小时窗口与周限额进度（首次会弹出钥匙串授权，选"始终允许"）。
-  - Codex：直接取会话日志内记录的 `rate_limits` 官方快照（used_percent / resets_at / 套餐）。
+- **官方限额（与 ChatGPT / Claude 应用内显示一致）**
+  - Codex：会话日志内记录的 `rate_limits` 官方快照（used_percent / resets_at / 套餐）。
+  - Claude：Claude Code 的 OAuth 凭据调用 `api.anthropic.com/api/oauth/usage`（macOS 读钥匙串，Windows 读 `~/.claude/.credentials.json`）。
 - **用量统计**：解析 `~/.claude/projects/**/*.jsonl` 与 `~/.codex/sessions/**/*.jsonl`，按天 / 模型 / 项目 / 会话汇总 token 与成本（LiteLLM 在线价格表 + 内置兜底价，缓存 24 小时）。
 - **重置动态**：codex-resets.com 的 `/api/resets`（重置总数、平均间隔、最长等待、公告列表）。
-- **局域网同步**：Mac 端内置只读快照服务（端口 48764，Bonjour `_aiusage._tcp`），iPhone 同一 Wi-Fi 下自动发现拉取，离线显示上次缓存；iOS 桌面小组件（小 / 中）显示限额环与今日成本。
+- **局域网同步**：桌面端（Mac/Windows）内置只读快照服务（HTTP 48764；Bonjour `_aiusage._tcp` + UDP 48765 发现应答），手机端自动发现拉取，离线显示上次缓存。原始会话内容不出本机，同步的只有汇总数。
 
-## 构建
+## 下载安装
 
-依赖 [xcodegen](https://github.com/yonaskolb/XcodeGen)（`brew install xcodegen`）：
+到 [Releases](../../releases) 下载：
+
+- `AIUsage-macOS.dmg` / `.zip` — 未签名，首次打开需右键 →「打开」，或运行 `xattr -cr /Applications/AIUsage.app`
+- `AIUsage-Windows-Setup.exe` — 安装版；`AIUsage-Windows-portable.zip` — 免安装版
+- `AIUsage-Android.apk` — 直接安装（允许未知来源）
+- `AIUsage-iOS-unsigned.ipa` — 未签名，需 AltStore / Sideloadly 等自签安装；或用 Xcode 免费账号自行构建（见下）
+
+## 从源码构建
+
+### macOS / iOS（Swift）
+
+依赖 [XcodeGen](https://github.com/yonaskolb/XcodeGen)：
 
 ```bash
-cd AIUsage
+brew install xcodegen
 xcodegen generate
 open AIUsage.xcodeproj
 ```
 
-三个 target：
+- 跑 Mac 端：scheme `AIUsage` → My Mac，⌘R。首次会弹两个系统询问：钥匙串读取 Claude 凭据（选「始终允许」）、防火墙监听（选「允许」）。
+- 跑 iPhone 端：Xcode → Settings → Accounts 登录普通 Apple ID，`AIUsageiOS` 的 Signing 选 Personal Team，选真机/模拟器 ⌘R。免费签名 7 天有效，过期重跑一次。
+- Bundle ID 前缀 `com.zhange` 与 App Group `group.com.zhange.aiusage` 可在 `project.yml` 中改，改完重新 `xcodegen generate`。
 
-| Target | 平台 | 说明 |
-|---|---|---|
-| `AIUsage` | macOS 14+ | 菜单栏 App（LSUIElement，不占 Dock） |
-| `AIUsageiOS` | iOS 17+ | iPhone/iPad App |
-| `AIUsageWidget` | iOS 17+ | 桌面小组件扩展 |
+### Windows / Android（Flutter）
 
-## 首次运行前（免费 Apple ID 即可）
+```bash
+cd flutter
+flutter build windows --release   # 在 Windows 上执行
+flutter build apk --release
+```
 
-1. **签名**：Xcode → Settings → Accounts 登录你的普通 Apple ID，各 target 的 Signing & Capabilities 里选择自动生成的 Personal Team。
-2. **Mac 端**：直接 Run 即可（菜单栏出现仪表图标）。首次会有两个系统弹窗：钥匙串读取 Claude 登录凭据（选「始终允许」）、防火墙是否允许监听（选「允许」，否则 iPhone 连不上）。
-3. **iOS 端**：真机安装需在 iPhone 的 设置 → 通用 → VPN 与设备管理 里信任你的开发者证书；免费账号签名 **7 天过期**，过期后重新 Run 一次即可。用模拟器则无任何限制。
-4. **App Group**：iOS App 与小组件共用 `group.com.zhange.aiusage`（免费账号支持）；如冲突可全局替换为自己的 group ID。
-5. Bundle ID 前缀 `com.zhange` 可在 `project.yml` 中改成自己的，改完重新 `xcodegen generate`。
+Android 使用仓库内的自签名 keystore（`flutter/android/app/upload-keystore.jks`，个人分发用途）。
+
+## Release 自动构建
+
+打 tag 即触发 GitHub Actions 构建全部平台安装包并发布 Release：
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 ## 已知说明
 
 - 成本为**按 API 定价的估算值**，订阅套餐（Pro/Max/Plus）实际不按此计费，仅用于衡量用量规模。
-- Claude 官方限额需要本机装有已登录的 Claude Code；令牌过期时在终端跑一次 `claude` 即可刷新。
-- 所有解析都在本机完成，原始会话内容不出 Mac；局域网同步的只有汇总数（每日成本、项目/会话名称与金额、限额百分比），服务只读、仅监听局域网。
-- iPhone 自动发现失败时，在 iOS「同步」页手动填 Mac 端设置页显示的地址（如 `my-mac.local:48764`）。
+- Claude 官方限额需要本机有 Claude Code 的登录凭据；只装了 Claude Desktop 时其余功能不受影响。
+- 手机端自动发现失败时，在「同步」页手动填桌面端地址（Mac 显示在设置页，如 `my-mac.local:48764`；Windows 用局域网 IP）。
 - codex-resets.com 为非官方数据源（监测 OpenAI 产品负责人 @thsottiaux 的推文）。
