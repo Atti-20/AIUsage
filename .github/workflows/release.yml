@@ -53,6 +53,16 @@ jobs:
       - name: Build Windows app
         run: flutter build windows --release
         working-directory: flutter
+      - name: Smoke launch Windows app
+        shell: pwsh
+        run: |
+          $app = "flutter\build\windows\x64\runner\Release\aiusage.exe"
+          $process = Start-Process -FilePath $app -PassThru
+          Start-Sleep -Seconds 8
+          if ($process.HasExited) {
+            throw "AI Usage exited during the Windows launch smoke test (code $($process.ExitCode))."
+          }
+          Stop-Process -Id $process.Id
       - name: Portable zip
         shell: pwsh
         run: |
