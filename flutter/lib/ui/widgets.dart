@@ -389,11 +389,22 @@ class SourceChip extends StatelessWidget {
 /// 30 天堆叠柱状趋势图（自绘）。
 class TrendChart extends StatelessWidget {
   final List<DailyStat> days;
-  const TrendChart({super.key, required this.days});
+  final bool showClaude;
+  final bool showCodex;
+  const TrendChart({
+    super.key,
+    required this.days,
+    this.showClaude = true,
+    this.showCodex = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final total = days.fold(0.0, (s, d) => s + d.totalCost);
+    final total = days.fold(
+      0.0,
+      (sum, day) =>
+          sum + day.visibleCost(showClaude: showClaude, showCodex: showCodex),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -410,6 +421,8 @@ class TrendChart extends StatelessWidget {
           child: CustomPaint(
             painter: _TrendPainter(
               days,
+              showClaude,
+              showCodex,
               Palette.claude(context),
               Palette.codex(context),
               Theme.of(
@@ -422,9 +435,10 @@ class TrendChart extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            _legendDot(context, Palette.claude(context), 'Claude'),
-            const SizedBox(width: 14),
-            _legendDot(context, Palette.codex(context), 'Codex'),
+            if (showClaude)
+              _legendDot(context, Palette.claude(context), 'Claude'),
+            if (showClaude && showCodex) const SizedBox(width: 14),
+            if (showCodex) _legendDot(context, Palette.codex(context), 'Codex'),
           ],
         ),
       ],
@@ -449,11 +463,21 @@ class TrendChart extends StatelessWidget {
 
 class _TrendPainter extends CustomPainter {
   final List<DailyStat> days;
+  final bool showClaude;
+  final bool showCodex;
   final Color claude;
   final Color codex;
   final Color grid;
   final Color label;
-  _TrendPainter(this.days, this.claude, this.codex, this.grid, this.label);
+  _TrendPainter(
+    this.days,
+    this.showClaude,
+    this.showCodex,
+    this.claude,
+    this.codex,
+    this.grid,
+    this.label,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -461,7 +485,13 @@ class _TrendPainter extends CustomPainter {
     const leftPad = 0.0, rightPad = 44.0, bottomPad = 18.0;
     final plotW = size.width - leftPad - rightPad;
     final plotH = size.height - bottomPad;
-    final maxCost = days.fold(0.0, (m, d) => math.max(m, d.totalCost));
+    final maxCost = days.fold(
+      0.0,
+      (maxValue, day) => math.max(
+        maxValue,
+        day.visibleCost(showClaude: showClaude, showCodex: showCodex),
+      ),
+    );
     final top = maxCost <= 0 ? 1.0 : maxCost * 1.08;
 
     final gridPaint = Paint()
@@ -493,8 +523,8 @@ class _TrendPainter extends CustomPainter {
     for (var i = 0; i < n; i++) {
       final d = days[i];
       final x = leftPad + slot * i + (slot - barW) / 2;
-      final hClaude = plotH * (d.claude.costUSD / top);
-      final hCodex = plotH * (d.codex.costUSD / top);
+      final hClaude = showClaude ? plotH * (d.claude.costUSD / top) : 0.0;
+      final hCodex = showCodex ? plotH * (d.codex.costUSD / top) : 0.0;
       // Claude 在下、Codex 在上，段间留 2px 表面间隙
       if (hClaude > 0.5) {
         canvas.drawRRect(
@@ -533,7 +563,14 @@ class _TrendPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_TrendPainter old) => old.days != days;
+  bool shouldRepaint(_TrendPainter old) =>
+      old.days != days ||
+      old.showClaude != showClaude ||
+      old.showCodex != showCodex ||
+      old.claude != claude ||
+      old.codex != codex ||
+      old.grid != grid ||
+      old.label != label;
 }
 
 /// 模型占比环图（自绘）+ 图例。

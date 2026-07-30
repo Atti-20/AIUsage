@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../fmt.dart';
 import '../models.dart';
@@ -17,10 +16,15 @@ class DashboardPage extends StatelessWidget {
     if (snapshot == null) {
       return _EmptyView(store: store);
     }
-    final limits = snapshot.allLimitWindows;
-    final projects = snapshot.projects.take(6).toList();
-    final maxCost = projects.isEmpty ? 0.0 : projects.first.tally.costUSD;
-
+    final limits = snapshot.allLimitWindows
+        .where(
+          (item) => snapshot.isSourceVisible(
+            item.$1,
+            showClaude: store.showClaudeUsage,
+            showCodex: store.showCodexUsage,
+          ),
+        )
+        .toList();
     return RefreshIndicator(
       onRefresh: store.refresh,
       child: ListView(
@@ -49,11 +53,7 @@ class DashboardPage extends StatelessWidget {
                 ),
               ),
             ),
-          _pageHeader(context),
-          const SizedBox(height: 22),
           if (limits.isNotEmpty) ...[
-            const TerminalEyebrow(text: 'active limit windows'),
-            const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
                 final twoColumns = constraints.maxWidth >= 640;
@@ -75,56 +75,54 @@ class DashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
-          if (snapshot.claudeLimits?.error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
+          if (store.showClaudeUsage &&
+              store.showOfficialLimitWarnings &&
+              snapshot.claudeLimits?.error != null)
+            _limitWarning(
+              snapshot.claudeLimits!.error!,
+              store.setShowOfficialLimitWarnings,
+            ),
+          if (store.showCodexUsage &&
+              store.showCodexResetPrediction &&
+              snapshot.codexResetForecast != null) ...[
+            _resetForecast(snapshot.codexResetForecast!),
+            const SizedBox(height: 12),
+          ],
+          if (!store.showClaudeUsage && !store.showCodexUsage) ...[
+            AppCard(
+              child: const Row(
                 children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: Palette.warning,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      snapshot.claudeLimits!.error!,
-                      style: const TextStyle(
-                        color: Palette.warning,
-                        fontSize: 12,
-                      ),
+                  Icon(Icons.visibility_off_outlined, color: Palette.muted),
+                  SizedBox(width: 8),
+                  Text(
+                    '用量显示已关闭',
+                    style: TextStyle(
+                      color: Palette.muted,
+                      fontFamily: 'monospace',
+                      fontSize: 11,
                     ),
                   ),
                 ],
               ),
             ),
-          _costHero(context, snapshot),
-          const SizedBox(height: 12),
-          AppCard(
-            title: '30 day usage signal',
-            child: TrendChart(days: snapshot.recentDays(30)),
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            title: 'model cost share',
-            child: ModelDonut(models: snapshot.models),
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            title: 'top projects',
-            child: projects.isEmpty
-                ? Text('暂无数据', style: Theme.of(context).textTheme.bodySmall)
-                : Column(
-                    children: [
-                      for (final p in projects)
-                        ProjectRow(project: p, maxCost: maxCost),
-                    ],
-                  ),
-          ),
+            const SizedBox(height: 12),
+          ],
+          if (store.showClaudeUsage || store.showCodexUsage) ...[
+            _costHero(context, snapshot),
+            const SizedBox(height: 12),
+            AppCard(
+              title: '近 30 天',
+              child: TrendChart(
+                days: snapshot.recentDays(30),
+                showClaude: store.showClaudeUsage,
+                showCodex: store.showCodexUsage,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Center(
             child: Text(
-              '更新于 ${Fmt.dateTime(snapshot.generatedAt)} · 来自 ${snapshot.deviceName}',
+              '更新于 ${Fmt.dateTime(snapshot.generatedAt)}',
               style: const TextStyle(
                 color: Palette.muted,
                 fontFamily: 'monospace',
@@ -138,40 +136,16 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _pageHeader(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            TerminalEyebrow(text: 'usage monitor / local'),
-            Spacer(),
-            StatusPill(text: 'LIVE SNAPSHOT'),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          '额度还够用吗？',
-          style: TextStyle(
-            color: Palette.ink,
-            fontFamily: 'monospace',
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1.1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Claude Code 与 Codex 的限额、重置时间和本地成本汇总。原始会话始终留在你的设备上。',
-          style: TextStyle(color: Palette.muted, fontSize: 13, height: 1.5),
-        ),
-      ],
-    );
-  }
-
   Widget _costHero(BuildContext context, UsageSnapshot snapshot) {
     final today = snapshot.today;
-    final stats = ResetStats.compute(snapshot.resets);
+    final visibleTodayCost = today.visibleCost(
+      showClaude: store.showClaudeUsage,
+      showCodex: store.showCodexUsage,
+    );
+    final visibleMonthCost = snapshot.visibleMonthCost(
+      showClaude: store.showClaudeUsage,
+      showCodex: store.showCodexUsage,
+    );
     return AppCard(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -179,10 +153,10 @@ class DashboardPage extends StatelessWidget {
           final primary = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const TerminalEyebrow(text: 'today / estimated cost'),
+              const TerminalEyebrow(text: '今日预估成本'),
               const SizedBox(height: 8),
               Text(
-                Fmt.usd(today.totalCost),
+                Fmt.usd(visibleTodayCost),
                 style: const TextStyle(
                   color: Palette.signal,
                   fontFamily: 'monospace',
@@ -196,14 +170,16 @@ class DashboardPage extends StatelessWidget {
                 spacing: 14,
                 runSpacing: 5,
                 children: [
-                  SourceChip(
-                    source: 'claude',
-                    text: Fmt.usd(today.claude.costUSD),
-                  ),
-                  SourceChip(
-                    source: 'codex',
-                    text: Fmt.usd(today.codex.costUSD),
-                  ),
+                  if (store.showClaudeUsage)
+                    SourceChip(
+                      source: 'claude',
+                      text: Fmt.usd(today.claude.costUSD),
+                    ),
+                  if (store.showCodexUsage)
+                    SourceChip(
+                      source: 'codex',
+                      text: Fmt.usd(today.codex.costUSD),
+                    ),
                 ],
               ),
             ],
@@ -211,16 +187,7 @@ class DashboardPage extends StatelessWidget {
           final statsRow = Wrap(
             spacing: 24,
             runSpacing: 14,
-            children: [
-              _quickStat(context, 'MONTH', Fmt.usd(snapshot.monthCost)),
-              _quickStat(context, '90 DAYS', Fmt.usd(snapshot.totalCost)),
-              if (stats.lastReset != null)
-                _quickStat(
-                  context,
-                  'GLOBAL RESET',
-                  Fmt.relative(stats.lastReset!),
-                ),
-            ],
+            children: [_quickStat(context, 'MONTH', Fmt.usd(visibleMonthCost))],
           );
           if (wide) {
             return Row(
@@ -272,6 +239,125 @@ class DashboardPage extends StatelessWidget {
       ],
     );
   }
+
+  Widget _limitWarning(String text, Future<void> Function(bool) setVisible) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(10, 9, 5, 9),
+      decoration: BoxDecoration(
+        color: Palette.warning.withValues(alpha: 0.08),
+        border: Border.all(color: Palette.warning.withValues(alpha: 0.34)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              size: 16,
+              color: Palette.warning,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Palette.warning,
+                fontFamily: 'monospace',
+                fontSize: 11,
+                height: 1.4,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: () => setVisible(false),
+            tooltip: '关闭此类提示，可在设置中重新开启',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close, size: 16, color: Palette.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resetForecast(CodexResetForecast forecast) {
+    Widget probability(String label, int value) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Palette.muted,
+              fontFamily: 'monospace',
+              fontSize: 9,
+            ),
+          ),
+          Text(
+            '$value%',
+            style: const TextStyle(
+              color: Palette.signal,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w700,
+              fontSize: 23,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return AppCard(
+      title: 'Codex 全球重置预测',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              probability('24H', forecast.probability24h),
+              const SizedBox(width: 24),
+              probability('48H', forecast.probability48h),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (forecast.lastResetAt != null)
+                    Text(
+                      '上次 ${Fmt.relative(forecast.lastResetAt!)}',
+                      style: const TextStyle(
+                        color: Palette.muted,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                      ),
+                    ),
+                  if (forecast.likelyWindow != null)
+                    Text(
+                      forecast.likelyWindow!,
+                      style: const TextStyle(
+                        color: Palette.muted,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'codex-reset.com · 社区预测',
+            style: TextStyle(
+              color: Palette.muted,
+              fontFamily: 'monospace',
+              fontSize: 9,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyView extends StatelessWidget {
@@ -291,8 +377,6 @@ class _EmptyView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const TerminalEyebrow(text: 'waiting for usage data'),
-                const SizedBox(height: 18),
                 Icon(
                   AppStore.isDesktopRole
                       ? Icons.hourglass_empty
@@ -304,7 +388,7 @@ class _EmptyView extends StatelessWidget {
                 Text(
                   store.isRefreshing
                       ? (AppStore.isDesktopRole ? '正在解析本地用量日志…' : '正在寻找桌面端…')
-                      : '暂无数据',
+                      : '未连接',
                   style: const TextStyle(
                     color: Palette.ink,
                     fontFamily: 'monospace',
@@ -312,25 +396,22 @@ class _EmptyView extends StatelessWidget {
                     fontSize: 24,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  store.syncError ??
-                      (AppStore.isDesktopRole
-                          ? '将解析本机 ~/.claude 与 ~/.codex 的会话日志'
-                          : '在 Mac/Windows 上运行「AI 用量」，并与本机连同一 Wi-Fi'),
-                  style: const TextStyle(
-                    color: Palette.muted,
-                    fontSize: 13,
-                    height: 1.5,
+                if (store.syncError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    store.syncError!,
+                    style: const TextStyle(
+                      color: Palette.muted,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 18),
                 FilledButton(
                   onPressed: store.isRefreshing ? null : store.refresh,
                   child: Text(
-                    AppStore.isDesktopRole
-                        ? '> REPARSE LOGS'
-                        : '> RETRY DISCOVERY',
+                    '重新连接',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w600,
@@ -346,205 +427,7 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
-/// codex-resets.com 重置动态页。
-class ResetsPage extends StatelessWidget {
-  final AppStore store;
-  const ResetsPage({super.key, required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    final events = store.resets;
-    final stats = ResetStats.compute(events);
-    return RefreshIndicator(
-      onRefresh: store.refresh,
-      child: ListView(
-        key: const PageStorageKey('resets-scroll'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(18),
-        children: [
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const TerminalEyebrow(text: 'global reset signal'),
-                    const Spacer(),
-                    StatusPill(
-                      text: events.isEmpty ? 'CHECKING FEED' : 'FEED ONLINE',
-                      isLive: events.isNotEmpty,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  stats.lastReset == null
-                      ? '尚无重置信号'
-                      : Fmt.relative(stats.lastReset!),
-                  style: const TextStyle(
-                    color: Palette.signal,
-                    fontFamily: 'monospace',
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  stats.lastReset == null
-                      ? '联网后会自动加载社区记录的全局重置动态。'
-                      : '最近一次已验证的全局重置：${Fmt.dateTime(stats.lastReset!)}',
-                  style: const TextStyle(color: Palette.muted, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _stat(context, 'VERIFIED RESETS', '${stats.count}'),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _stat(
-                  context,
-                  'AVERAGE GAP',
-                  stats.averageIntervalDays == null
-                      ? '-'
-                      : Fmt.days(stats.averageIntervalDays!),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _stat(
-                  context,
-                  'LONGEST WAIT',
-                  stats.longestIntervalDays == null
-                      ? '-'
-                      : Fmt.days(stats.longestIntervalDays!),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _stat(
-                  context,
-                  'LAST SIGNAL',
-                  stats.lastReset == null
-                      ? '-'
-                      : Fmt.relative(stats.lastReset!),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            title: 'verified reset timeline',
-            child: events.isEmpty
-                ? Text(
-                    '暂无数据，下拉刷新',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  )
-                : Column(
-                    children: [
-                      for (final (i, e) in events.indexed) ...[
-                        if (i > 0) const Divider(height: 20),
-                        _eventRow(context, e),
-                      ],
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: const Text(
-              'SOURCE / codex-resets.com · 非官方社区信号',
-              style: TextStyle(
-                color: Palette.muted,
-                fontFamily: 'monospace',
-                fontSize: 9,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(BuildContext context, String title, String value) {
-    return AppCard(
-      title: title,
-      child: Text(
-        value,
-        style: const TextStyle(
-          color: Palette.ink,
-          fontFamily: 'monospace',
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _eventRow(BuildContext context, ResetEvent e) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              Fmt.relative(e.announcedAt).toUpperCase(),
-              style: const TextStyle(
-                color: Palette.signal,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              Fmt.dateTime(e.announcedAt),
-              style: const TextStyle(
-                color: Palette.muted,
-                fontFamily: 'monospace',
-                fontSize: 10,
-              ),
-            ),
-            const Spacer(),
-            if (e.tweetURL.isNotEmpty)
-              InkWell(
-                onTap: () => launchUrl(
-                  Uri.parse(e.tweetURL),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: const Text(
-                  'SOURCE ↗',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Palette.signal,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        Text(
-          e.text,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13, height: 1.4),
-        ),
-      ],
-    );
-  }
-}
-
-/// 同步 / 设置页。
+/// 显示与连接设置。
 class SyncPage extends StatefulWidget {
   final AppStore store;
   const SyncPage({super.key, required this.store});
@@ -567,38 +450,33 @@ class _SyncPageState extends State<SyncPage> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    final snapshot = store.snapshot;
     return ListView(
       key: const PageStorageKey('sync-scroll'),
       padding: const EdgeInsets.all(16),
       children: [
         AppCard(
-          title: '同步状态',
+          title: '显示',
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _row(
-                '数据快照',
-                snapshot == null ? '暂无' : '来自 ${snapshot.deviceName}',
+              _displaySwitch(
+                title: '显示 Claude Code 用量',
+                value: store.showClaudeUsage,
+                onChanged: store.setShowClaudeUsage,
               ),
-              if (snapshot != null)
-                _row('生成时间', Fmt.dateTime(snapshot.generatedAt)),
-              if (store.lastSyncAt != null)
-                _row('上次同步', Fmt.dateTime(store.lastSyncAt!)),
-              if (AppStore.isDesktopRole)
-                _row('局域网服务', store.serverRunning ? '运行中（手机可同步本机数据）' : '未运行'),
-              if (store.syncError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    store.syncError!,
-                    style: const TextStyle(color: Colors.orange, fontSize: 12),
-                  ),
-                ),
-              const SizedBox(height: 10),
-              FilledButton.tonal(
-                onPressed: store.isRefreshing ? null : store.refresh,
-                child: Text(store.isRefreshing ? '同步中…' : '立即刷新'),
+              _displaySwitch(
+                title: '显示 Codex 用量',
+                value: store.showCodexUsage,
+                onChanged: store.setShowCodexUsage,
+              ),
+              _displaySwitch(
+                title: '显示官方限额缺失提示',
+                value: store.showOfficialLimitWarnings,
+                onChanged: store.setShowOfficialLimitWarnings,
+              ),
+              _displaySwitch(
+                title: 'Codex 全球重置预测',
+                value: store.showCodexResetPrediction,
+                onChanged: store.setShowCodexResetPrediction,
               ),
             ],
           ),
@@ -606,14 +484,14 @@ class _SyncPageState extends State<SyncPage> {
         if (!AppStore.isDesktopRole) ...[
           const SizedBox(height: 12),
           AppCard(
-            title: '手动地址（自动发现失败时）',
+            title: '连接',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: _controller,
                   decoration: const InputDecoration(
-                    hintText: '如 192.168.1.10:48764',
+                    hintText: '电脑地址，例如 192.168.1.10:48764',
                     isDense: true,
                   ),
                   keyboardType: TextInputType.url,
@@ -634,7 +512,7 @@ class _SyncPageState extends State<SyncPage> {
                           _controller.clear();
                           store.saveManualAddress('');
                         },
-                        child: const Text('清除，改用自动发现'),
+                        child: const Text('使用自动发现'),
                       ),
                   ],
                 ),
@@ -642,43 +520,28 @@ class _SyncPageState extends State<SyncPage> {
             ),
           ),
         ],
-        const SizedBox(height: 12),
-        AppCard(
-          title: '说明',
-          child: Text(
-            AppStore.isDesktopRole
-                ? '本机解析 ~/.claude 与 ~/.codex 的会话日志，成本按各模型 API 定价估算（订阅套餐实际不另计费）。'
-                      '本机同时提供局域网只读服务（端口 48764），Android 端可自动发现同步。'
-                : '用量数据来自局域网内的 Mac/Windows「AI 用量」，离线时显示上次缓存；重置动态独立在线刷新。',
-            style: const TextStyle(fontSize: 13, height: 1.5),
-          ),
-        ),
       ],
     );
   }
 
-  Widget _row(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13),
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
+  Widget _displaySwitch({
+    required String title,
+    required bool value,
+    required Future<void> Function(bool) onChanged,
+  }) {
+    return SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      dense: true,
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Palette.ink,
+          fontFamily: 'monospace',
+          fontSize: 12,
+        ),
       ),
+      value: value,
+      onChanged: onChanged,
     );
   }
 }

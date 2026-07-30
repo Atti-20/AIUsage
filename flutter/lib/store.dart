@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
@@ -11,29 +12,37 @@ import 'parsers.dart';
 import 'pricing.dart';
 
 /// 应用数据中枢。
-/// 桌面角色（Windows/macOS/Linux）：本地解析 + 官方限额 + 重置动态 + 局域网服务。
-/// 移动角色（Android）：局域网发现/手动地址拉取 + 本地缓存 + 重置动态。
+/// 桌面角色（Windows/macOS/Linux）：本地解析 + 官方限额 + 重置预测 + 局域网服务。
+/// 移动角色（Android）：局域网发现/手动地址拉取 + 本地缓存 + 重置预测。
 class AppStore extends ChangeNotifier {
+  static const _widgetChannel = MethodChannel('aiusage/widget');
   static bool get isDesktopRole =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   UsageSnapshot? snapshot;
-  List<ResetEvent>? freshResets;
   bool isRefreshing = false;
   String? syncError;
   DateTime? lastSyncAt;
   String manualAddress = '';
   bool serverRunning = false;
+  bool showClaudeUsage = true;
+  bool showCodexUsage = true;
+  bool showOfficialLimitWarnings = true;
+  bool showCodexResetPrediction = true;
 
   final _server = SnapshotServer();
   Timer? _timer;
   SharedPreferences? _prefs;
 
-  List<ResetEvent> get resets => freshResets ?? snapshot?.resets ?? [];
-
   Future<void> start() async {
     _prefs = await SharedPreferences.getInstance();
     manualAddress = _prefs?.getString('manualAddress') ?? '';
+    showClaudeUsage = _prefs?.getBool('display.showClaudeUsage') ?? true;
+    showCodexUsage = _prefs?.getBool('display.showCodexUsage') ?? true;
+    showOfficialLimitWarnings =
+        _prefs?.getBool('display.showOfficialLimitWarnings') ?? true;
+    showCodexResetPrediction =
+        _prefs?.getBool('display.showCodexResetPrediction') ?? true;
     final cached = _prefs?.getString('snapshotCache');
     if (cached != null) {
       try {
@@ -59,6 +68,32 @@ class AppStore extends ChangeNotifier {
     await refresh();
   }
 
+  Future<void> setShowClaudeUsage(bool value) async {
+    showClaudeUsage = value;
+    notifyListeners();
+    await _prefs?.setBool('display.showClaudeUsage', value);
+    await _reloadAndroidWidget();
+  }
+
+  Future<void> setShowCodexUsage(bool value) async {
+    showCodexUsage = value;
+    notifyListeners();
+    await _prefs?.setBool('display.showCodexUsage', value);
+    await _reloadAndroidWidget();
+  }
+
+  Future<void> setShowOfficialLimitWarnings(bool value) async {
+    showOfficialLimitWarnings = value;
+    notifyListeners();
+    await _prefs?.setBool('display.showOfficialLimitWarnings', value);
+  }
+
+  Future<void> setShowCodexResetPrediction(bool value) async {
+    showCodexResetPrediction = value;
+    notifyListeners();
+    await _prefs?.setBool('display.showCodexResetPrediction', value);
+  }
+
   Future<void> refresh() async {
     if (isRefreshing) return;
     isRefreshing = true;
@@ -73,7 +108,14 @@ class AppStore extends ChangeNotifier {
       }
     } finally {
       try {
-        freshResets = await ResetsClient.fetch();
+        final forecast = await CodexResetForecastClient.fetch();
+        snapshot?.codexResetForecast = forecast;
+        if (snapshot != null) {
+          if (isDesktopRole) {
+            _server.payload = jsonEncode(snapshot!.toJson());
+          }
+          await _cache(snapshot!);
+        }
       } catch (_) {}
       isRefreshing = false;
       notifyListeners();
@@ -86,13 +128,11 @@ class AppStore extends ChangeNotifier {
     await Pricing.shared.loadRemoteIfNeeded();
 
     final claudeFuture = ClaudeOAuth.fetch();
-    final resetsFuture = ResetsClient.fetch().catchError((_) => <ResetEvent>[]);
     final snap =
         await compute(_parseInBackground, null) ??
         await LocalParser(Pricing.shared).parseAll();
 
     snap.claudeLimits = await claudeFuture;
-    snap.resets = (await resetsFuture).take(60).toList();
     snapshot = snap;
     lastSyncAt = DateTime.now();
     _server.payload = jsonEncode(snap.toJson());
@@ -117,6 +157,14 @@ class AppStore extends ChangeNotifier {
   Future<void> _cache(UsageSnapshot snap) async {
     try {
       await _prefs?.setString('snapshotCache', jsonEncode(snap.toJson()));
+      await _reloadAndroidWidget();
+    } catch (_) {}
+  }
+
+  Future<void> _reloadAndroidWidget() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _widgetChannel.invokeMethod<void>('reload');
     } catch (_) {}
   }
 }

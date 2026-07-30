@@ -4,6 +4,8 @@ import SwiftUI
 struct MenuBarView: View {
     @EnvironmentObject var store: UsageStore
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(DisplayPreferenceKeys.showClaudeUsage) private var showClaudeUsage = true
+    @AppStorage(DisplayPreferenceKeys.showCodexUsage) private var showCodexUsage = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -15,49 +17,62 @@ struct MenuBarView: View {
                         .foregroundStyle(Palette.ink)
                 }
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
-                Spacer()
-                StatusPill(text: "LOCAL")
             }
 
             if let snapshot = store.snapshot {
-                HStack(spacing: 16) {
-                    ForEach(Array(snapshot.allLimitWindows.prefix(3)), id: \.window.id) { item in
-                        VStack(spacing: 4) {
-                            RingGauge(percent: item.window.utilization,
-                                      tint: Palette.color(for: item.source),
-                                      lineWidth: 6, size: 48)
-                            Text("\(item.source.displayName) \(item.window.label)")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(Palette.muted)
-                                .lineLimit(1)
+                let visibleLimits = snapshot.allLimitWindows.filter {
+                    snapshot.isSourceVisible(
+                        $0.source,
+                        showClaude: showClaudeUsage,
+                        showCodex: showCodexUsage
+                    )
+                }
+                if showClaudeUsage || showCodexUsage {
+                    HStack(spacing: 16) {
+                        ForEach(Array(visibleLimits.prefix(3)), id: \.window.id) { item in
+                            VStack(spacing: 4) {
+                                RingGauge(percent: item.window.utilization,
+                                          tint: Palette.color(for: item.source),
+                                          lineWidth: 6, size: 48)
+                                Text("\(item.source.displayName) \(item.window.label)")
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(Palette.muted)
+                                    .lineLimit(1)
+                            }
                         }
                     }
-                }
-                .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity)
 
-                Divider()
+                    Divider()
 
-                Grid(alignment: .leading, verticalSpacing: 4) {
-                    GridRow {
-                        Text("TODAY COST").foregroundStyle(Palette.muted)
-                        Text(Fmt.usd(snapshot.today.totalCost)).gridColumnAlignment(.trailing)
-                    }
-                    GridRow {
-                        Text("MONTH").foregroundStyle(Palette.muted)
-                        Text(Fmt.usd(snapshot.monthCost))
-                    }
-                    if let last = ResetStats.compute(from: snapshot.resets).lastReset {
+                    Grid(alignment: .leading, verticalSpacing: 4) {
                         GridRow {
-                            Text("GLOBAL RESET").foregroundStyle(Palette.muted)
-                            Text(Fmt.relative(last))
+                            Text("TODAY COST").foregroundStyle(Palette.muted)
+                            Text(Fmt.usd(snapshot.today.visibleCost(
+                                showClaude: showClaudeUsage,
+                                showCodex: showCodexUsage
+                            )))
+                            .gridColumnAlignment(.trailing)
+                        }
+                        GridRow {
+                            Text("MONTH").foregroundStyle(Palette.muted)
+                            Text(Fmt.usd(snapshot.visibleMonthCost(
+                                showClaude: showClaudeUsage,
+                                showCodex: showCodexUsage
+                            )))
                         }
                     }
+                    .font(.system(size: 11, design: .monospaced).monospacedDigit())
+                } else {
+                    Label("用量显示已关闭", systemImage: "eye.slash")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
                 }
-                .font(.system(size: 11, design: .monospaced).monospacedDigit())
             } else {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text(store.isRefreshing ? "> 正在解析用量数据…" : "> 暂无数据")
+                    Text(store.isRefreshing ? "正在读取…" : "暂无数据")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Palette.muted)
                 }

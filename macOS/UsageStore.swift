@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// macOS 端数据中枢：定时解析本地日志 + 拉取官方限额与重置动态，
+/// macOS 端数据中枢：定时解析本地日志 + 拉取官方限额与全球重置预测，
 /// 汇总成 UsageSnapshot 发布给界面，并写入 iCloud 供 iOS 端读取。
 @MainActor
 final class UsageStore: ObservableObject {
@@ -31,9 +31,13 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    var menuBarTitle: String {
+    func menuBarTitle(showClaude: Bool, showCodex: Bool) -> String {
+        guard showClaude || showCodex else { return "AI" }
         guard let snapshot else { return "AI" }
-        return Fmt.usd(snapshot.today.totalCost)
+        return Fmt.usd(snapshot.today.visibleCost(
+            showClaude: showClaude,
+            showCodex: showCodex
+        ))
     }
 
     func refresh() {
@@ -46,13 +50,16 @@ final class UsageStore: ObservableObject {
             await Pricing.shared.loadRemoteIfNeeded()
 
             async let claudeLimits = ClaudeOAuthClient.fetch()
-            async let resets = (try? CodexResetsClient.fetch()) ?? []
+            async let codexResetForecast = try? CodexResetForecastClient.fetch()
 
             let builder = AggregateBuilder()
             ClaudeLogParser().parse(into: builder)
             CodexLogParser().parse(into: builder)
 
-            let snapshot = builder.build(claudeLimits: await claudeLimits, resets: await resets)
+            let snapshot = builder.build(
+                claudeLimits: await claudeLimits,
+                codexResetForecast: await codexResetForecast
+            )
             if let data = try? SyncStore.encoder.encode(snapshot) {
                 SnapshotServer.shared.update(data)
             }

@@ -47,7 +47,10 @@ final class AggregateBuilder {
         perProject[pKey] = p
     }
 
-    func build(claudeLimits: ClaudeLimits?, resets: [ResetEvent]) -> UsageSnapshot {
+    func build(
+        claudeLimits: ClaudeLimits?,
+        codexResetForecast: CodexResetForecast?
+    ) -> UsageSnapshot {
         var snapshot = UsageSnapshot(generatedAt: Date(), deviceName: Host.current().localizedName ?? "Mac")
         snapshot.days = perDay.values.sorted { $0.day < $1.day }
         snapshot.models = perModel.values.sorted { $0.tally.costUSD > $1.tally.costUSD }
@@ -59,7 +62,7 @@ final class AggregateBuilder {
             .prefix(50))
         snapshot.claudeLimits = claudeLimits
         snapshot.codexLimits = codexLimits
-        snapshot.resets = Array(resets.prefix(60))
+        snapshot.codexResetForecast = codexResetForecast
         return snapshot
     }
 }

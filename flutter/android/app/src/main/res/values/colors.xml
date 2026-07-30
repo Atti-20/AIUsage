@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="terminal_canvas">#0B0F0D</color>
+    <color name="widget_background">#F5F7F5</color>
+    <color name="widget_text">#1A1C1A</color>
+    <color name="widget_muted">#5F6360</color>
+    <color name="widget_signal">#326A4D</color>
+    <color name="widget_claude">#7A5738</color>
+    <color name="widget_track">#DDE5DF</color>
+    <color name="widget_app_text">#F1F5F2</color>
+    <color name="widget_app_muted">#93A19A</color>
+    <color name="widget_app_signal">#63E6A5</color>
+    <color name="widget_app_claude">#D9A06F</color>
+    <color name="widget_app_track">#30413A</color>
 </resources>

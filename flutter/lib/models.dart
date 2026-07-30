@@ -56,6 +56,9 @@ class DailyStat {
 
   double get totalCost => claude.costUSD + codex.costUSD;
 
+  double visibleCost({required bool showClaude, required bool showCodex}) =>
+      (showClaude ? claude.costUSD : 0) + (showCodex ? codex.costUSD : 0);
+
   TokenTally tallyFor(String source) => source == 'claude' ? claude : codex;
 
   factory DailyStat.fromJson(Map<String, dynamic> j) => DailyStat(
@@ -257,6 +260,44 @@ class CodexLimits {
   };
 }
 
+class CodexResetForecast {
+  DateTime updatedAt;
+  int probability24h;
+  int probability48h;
+  String confidence;
+  DateTime? lastResetAt;
+  String? likelyWindow;
+
+  CodexResetForecast({
+    required this.updatedAt,
+    required this.probability24h,
+    required this.probability48h,
+    required this.confidence,
+    this.lastResetAt,
+    this.likelyWindow,
+  });
+
+  factory CodexResetForecast.fromJson(Map<String, dynamic> j) =>
+      CodexResetForecast(
+        updatedAt: parseDate(j['updated_at']) ?? DateTime.now(),
+        probability24h: (j['probability_24h'] as num?)?.toInt() ?? 0,
+        probability48h: (j['probability_48h'] as num?)?.toInt() ?? 0,
+        confidence: j['confidence'] as String? ?? 'low',
+        lastResetAt: parseDate(j['last_reset_at']),
+        likelyWindow: j['likely_window'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'updated_at': updatedAt.toUtc().toIso8601String(),
+    'probability_24h': probability24h,
+    'probability_48h': probability48h,
+    'confidence': confidence,
+    if (lastResetAt != null)
+      'last_reset_at': lastResetAt!.toUtc().toIso8601String(),
+    if (likelyWindow != null) 'likely_window': likelyWindow,
+  };
+}
+
 class ResetEvent {
   String tweetID;
   String tweetURL;
@@ -319,6 +360,7 @@ class UsageSnapshot {
   List<SessionStat> sessions;
   ClaudeLimits? claudeLimits;
   CodexLimits? codexLimits;
+  CodexResetForecast? codexResetForecast;
   List<ResetEvent> resets;
 
   UsageSnapshot({
@@ -330,6 +372,7 @@ class UsageSnapshot {
     List<SessionStat>? sessions,
     this.claudeLimits,
     this.codexLimits,
+    this.codexResetForecast,
     List<ResetEvent>? resets,
   }) : days = days ?? [],
        models = models ?? [],
@@ -358,6 +401,9 @@ class UsageSnapshot {
     codexLimits: j['codexLimits'] == null
         ? null
         : CodexLimits.fromJson((j['codexLimits'] as Map).cast()),
+    codexResetForecast: j['codexResetForecast'] == null
+        ? null
+        : CodexResetForecast.fromJson((j['codexResetForecast'] as Map).cast()),
     resets: ((j['resets'] as List?) ?? [])
         .map((e) => ResetEvent.fromJson((e as Map).cast()))
         .toList(),
@@ -372,6 +418,8 @@ class UsageSnapshot {
     'sessions': sessions.map((s) => s.toJson()).toList(),
     if (claudeLimits != null) 'claudeLimits': claudeLimits!.toJson(),
     if (codexLimits != null) 'codexLimits': codexLimits!.toJson(),
+    if (codexResetForecast != null)
+      'codexResetForecast': codexResetForecast!.toJson(),
     'resets': resets.map((r) => r.toJson()).toList(),
   };
 
@@ -388,6 +436,33 @@ class UsageSnapshot {
   }
 
   double get totalCost => days.fold(0.0, (s, d) => s + d.totalCost);
+
+  double visibleMonthCost({required bool showClaude, required bool showCodex}) {
+    final prefix = dayKey(DateTime.now()).substring(0, 7);
+    return days
+        .where((d) => d.day.startsWith(prefix))
+        .fold(
+          0.0,
+          (sum, day) =>
+              sum +
+              day.visibleCost(showClaude: showClaude, showCodex: showCodex),
+        );
+  }
+
+  double visibleTotalCost({
+    required bool showClaude,
+    required bool showCodex,
+  }) => days.fold(
+    0.0,
+    (sum, day) =>
+        sum + day.visibleCost(showClaude: showClaude, showCodex: showCodex),
+  );
+
+  bool isSourceVisible(
+    String source, {
+    required bool showClaude,
+    required bool showCodex,
+  }) => source == 'claude' ? showClaude : showCodex;
 
   List<DailyStat> recentDays(int n) =>
       days.length <= n ? days : days.sublist(days.length - n);

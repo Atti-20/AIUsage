@@ -94,11 +94,7 @@ class _AIUsageAppState extends State<AIUsageApp> {
       home: ListenableBuilder(
         listenable: store,
         builder: (context, _) {
-          final pages = [
-            DashboardPage(store: store),
-            ResetsPage(store: store),
-            SyncPage(store: store),
-          ];
+          final pages = [DashboardPage(store: store), SyncPage(store: store)];
           final wide = MediaQuery.of(context).size.width >= 700;
           final body = pages[_tab];
           if (wide) {
@@ -113,8 +109,7 @@ class _AIUsageAppState extends State<AIUsageApp> {
   Widget _desktopShell(Widget body) {
     const destinations = [
       (Icons.terminal_rounded, '用量'),
-      (Icons.restart_alt_rounded, '重置动态'),
-      (Icons.sync_rounded, '同步'),
+      (Icons.settings_rounded, '设置'),
     ];
     return Scaffold(
       body: Row(
@@ -140,13 +135,6 @@ class _AIUsageAppState extends State<AIUsageApp> {
                       child: _sideNavItem(index, item.$1, item.$2),
                     ),
                   const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: StatusPill(
-                      text: store.serverRunning ? 'SYNC ONLINE' : 'LOCAL MODE',
-                      isLive: true,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -219,10 +207,9 @@ class _AIUsageAppState extends State<AIUsageApp> {
             label: '用量',
           ),
           NavigationDestination(
-            icon: Icon(Icons.restart_alt_rounded),
-            label: '重置',
+            icon: Icon(Icons.settings_rounded),
+            label: '设置',
           ),
-          NavigationDestination(icon: Icon(Icons.sync_rounded), label: '同步'),
         ],
       ),
     );
@@ -255,17 +242,6 @@ class _AIUsageAppState extends State<AIUsageApp> {
                 ),
               ),
             ],
-          ),
-          SizedBox(height: 5),
-          Text(
-            'LOCAL USAGE METER',
-            style: TextStyle(
-              color: Palette.muted,
-              fontFamily: 'monospace',
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1.1,
-            ),
           ),
         ],
       ),

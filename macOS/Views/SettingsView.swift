@@ -3,6 +3,10 @@ import ServiceManagement
 
 struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
+    @AppStorage(DisplayPreferenceKeys.showClaudeUsage) private var showClaudeUsage = true
+    @AppStorage(DisplayPreferenceKeys.showCodexUsage) private var showCodexUsage = true
+    @AppStorage(DisplayPreferenceKeys.showOfficialLimitWarnings) private var showOfficialLimitWarnings = true
+    @AppStorage(DisplayPreferenceKeys.showCodexResetPrediction) private var showCodexResetPrediction = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginItemError: String?
 
@@ -22,7 +26,14 @@ struct SettingsView: View {
                     .disabled(store.isRefreshing)
             }
 
-            Section("iPhone 同步（局域网）") {
+            Section("显示内容") {
+                Toggle("显示 Claude Code 用量", isOn: $showClaudeUsage)
+                Toggle("显示 Codex 用量", isOn: $showCodexUsage)
+                Toggle("显示官方限额缺失提示", isOn: $showOfficialLimitWarnings)
+                Toggle("Codex 全球重置预测", isOn: $showCodexResetPrediction)
+            }
+
+            Section("手机同步") {
                 LabeledContent("同步服务") {
                     if store.serverRunning {
                         Label("运行中", systemImage: "antenna.radiowaves.left.and.right")
@@ -34,9 +45,6 @@ struct SettingsView: View {
                     }
                 }
                 LabeledContent("手动连接地址", value: SnapshotServer.manualAddress)
-                Text("iPhone 与 Mac 连同一 Wi-Fi，打开 iOS 端会自动发现本机；找不到时在 iPhone 的「同步」页填上面的地址。若 macOS 弹出防火墙询问，请选择「允许」。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section("启动") {
@@ -57,17 +65,6 @@ struct SettingsView: View {
                 if let loginItemError {
                     Text(loginItemError).font(.caption).foregroundStyle(.orange)
                 }
-            }
-
-            Section("数据来源") {
-                LabeledContent("Claude 用量", value: "~/.claude/projects/**/*.jsonl")
-                LabeledContent("Codex 用量", value: "~/.codex/sessions/**/*.jsonl")
-                LabeledContent("Claude 官方限额", value: "钥匙串 OAuth → api.anthropic.com")
-                LabeledContent("Codex 官方限额", value: "会话日志内 rate_limits 快照")
-                LabeledContent("重置动态", value: "codex-resets.com（非官方）")
-                Text("成本按各模型 API 定价估算（在线同步 LiteLLM 价格表，缓存 24 小时），订阅套餐实际不另收费，仅供衡量用量规模。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -5,23 +5,29 @@ import 'package:http/http.dart' as http;
 
 import 'models.dart';
 
-/// codex-resets.com 重置动态。
-class ResetsClient {
-  static Future<List<ResetEvent>> fetch() async {
+class CodexResetForecastClient {
+  static Future<CodexResetForecast> fetch() async {
     final resp = await http
         .get(
-          Uri.parse('https://codex-resets.com/api/resets'),
+          Uri.parse('https://codex-reset.com/api/forecast'),
           headers: {'accept': 'application/json'},
         )
         .timeout(const Duration(seconds: 15));
     if (resp.statusCode != 200) throw HttpException('HTTP ${resp.statusCode}');
-    final root = jsonDecode(utf8.decode(resp.bodyBytes));
-    final events =
-        ((root as Map)['events'] as List? ?? [])
-            .map((e) => ResetEvent.fromJson((e as Map).cast()))
-            .toList()
-          ..sort((a, b) => b.announcedAt.compareTo(a.announcedAt));
-    return events;
+    final root = (jsonDecode(utf8.decode(resp.bodyBytes)) as Map)
+        .cast<String, dynamic>();
+    final probabilities = (root['probabilities'] as Map?)?.cast() ?? const {};
+    final timeWindow = (root['time_window'] as Map?)?.cast() ?? const {};
+    return CodexResetForecast(
+      updatedAt: parseDate(root['updated_at']) ?? DateTime.now(),
+      probability24h: (probabilities['rounded_24h'] as num?)?.toInt() ?? 0,
+      probability48h: (probabilities['rounded_48h'] as num?)?.toInt() ?? 0,
+      confidence: root['confidence'] as String? ?? 'low',
+      lastResetAt: parseDate(root['last_reset_at']),
+      likelyWindow: timeWindow['label'] == null
+          ? null
+          : '${timeWindow['label']} ${timeWindow['timezone'] ?? 'UTC'}',
+    );
   }
 }
 

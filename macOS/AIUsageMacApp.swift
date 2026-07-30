@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct AIUsageMacApp: App {
     @StateObject private var store = UsageStore()
+    @AppStorage(DisplayPreferenceKeys.showClaudeUsage) private var showClaudeUsage = true
+    @AppStorage(DisplayPreferenceKeys.showCodexUsage) private var showCodexUsage = true
 
     var body: some Scene {
         MenuBarExtra {
@@ -12,7 +14,10 @@ struct AIUsageMacApp: App {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "gauge.with.needle")
-                Text(store.menuBarTitle)
+                Text(store.menuBarTitle(
+                    showClaude: showClaudeUsage,
+                    showCodex: showCodexUsage
+                ))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
             }
             .task { store.startIfNeeded() }

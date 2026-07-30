@@ -16,11 +16,10 @@ struct AIUsageiOSApp: App {
 
 /// iOS 端数据中枢：局域网发现 Mac 上的快照服务并拉取，
 /// 成功后缓存到 App Group（离线可看 + 小组件读取）；
-/// 重置动态另行在线拉取保证新鲜。
+/// 全球重置预测另行在线拉取保证新鲜。
 @MainActor
 final class IOSStore: ObservableObject {
     @Published var snapshot: UsageSnapshot?
-    @Published var freshResets: [ResetEvent]?
     @Published var isRefreshing = false
     @Published var syncError: String?
     @Published var lastSyncAt: Date?
@@ -30,10 +29,6 @@ final class IOSStore: ObservableObject {
     init() {
         snapshot = SyncStore.readAppGroupCache()
         Task { await refresh() }
-    }
-
-    var resets: [ResetEvent] {
-        freshResets ?? snapshot?.resets ?? []
     }
 
     func refresh() async {
@@ -59,8 +54,12 @@ final class IOSStore: ObservableObject {
                 : "本次同步失败，正在显示上次缓存的数据"
         }
 
-        if let events = try? await CodexResetsClient.fetch() {
-            freshResets = events
+        if let forecast = try? await CodexResetForecastClient.fetch() {
+            snapshot?.codexResetForecast = forecast
+            if let snapshot {
+                SyncStore.writeAppGroupCache(snapshot)
+                WidgetCenter.shared.reloadAllTimelines()
+            }
         }
         isRefreshing = false
     }

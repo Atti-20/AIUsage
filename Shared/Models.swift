@@ -109,7 +109,27 @@ struct CodexLimits: Codable {
     var capturedAt: Date?
 }
 
-// MARK: - codex-resets.com 重置事件
+// MARK: - Codex 重置预测与事件
+
+/// codex-reset.com 对不定期全球额度重置的社区预测。
+/// 个人 5 小时与周度窗口仍以 Codex 官方返回的 resetsAt 为准。
+struct CodexResetForecast: Codable {
+    var updatedAt: Date
+    var probability24h: Int
+    var probability48h: Int
+    var confidence: String
+    var lastResetAt: Date?
+    var likelyWindow: String?
+
+    enum CodingKeys: String, CodingKey {
+        case updatedAt = "updated_at"
+        case probability24h = "probability_24h"
+        case probability48h = "probability_48h"
+        case confidence
+        case lastResetAt = "last_reset_at"
+        case likelyWindow = "likely_window"
+    }
+}
 
 struct ResetEvent: Codable, Identifiable {
     var tweetID: String
@@ -159,6 +179,7 @@ struct UsageSnapshot: Codable {
     var sessions: [SessionStat] = []
     var claudeLimits: ClaudeLimits?
     var codexLimits: CodexLimits?
+    var codexResetForecast: CodexResetForecast?
     var resets: [ResetEvent] = []         // 降序（最新在前）
 
     // MARK: 便捷计算

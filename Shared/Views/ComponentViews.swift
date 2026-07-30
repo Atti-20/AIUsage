@@ -68,6 +68,79 @@ struct StatusPill: View {
     }
 }
 
+struct LimitWarningBanner: View {
+    var text: String
+    var onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(Palette.warning)
+                .padding(.top, 1)
+            Text(text)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Palette.muted)
+                    .padding(5)
+            }
+            .buttonStyle(.plain)
+            .help("关闭此类提示，可在设置中重新开启")
+            .accessibilityLabel("关闭官方限额提示")
+        }
+        .padding(10)
+        .background(Palette.warning.opacity(0.08))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Palette.warning.opacity(0.34), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct CodexResetForecastCard: View {
+    var forecast: CodexResetForecast
+
+    var body: some View {
+        Card(title: "Codex 全球重置预测") {
+            HStack(spacing: 22) {
+                probability("24H", forecast.probability24h)
+                probability("48H", forecast.probability48h)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    if let lastResetAt = forecast.lastResetAt {
+                        Text("上次 \(Fmt.relative(lastResetAt))")
+                    }
+                    if let likelyWindow = forecast.likelyWindow {
+                        Text(likelyWindow)
+                    }
+                }
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+            }
+            Text("codex-reset.com · 社区预测")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+        }
+    }
+
+    private func probability(_ label: String, _ value: Int) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+            Text("\(value)%")
+                .font(.system(size: 23, weight: .bold, design: .monospaced))
+                .foregroundStyle(Palette.codex)
+                .monospacedDigit()
+        }
+    }
+}
+
 // MARK: - 限额环
 
 struct RingGauge: View {
@@ -220,6 +293,8 @@ struct SourceChip: View {
 
 struct TrendChart: View {
     var days: [DailyStat]
+    var showClaude: Bool = true
+    var showCodex: Bool = true
     @State private var selection: Date?
 
     var body: some View {
@@ -229,50 +304,61 @@ struct TrendChart: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
-            Chart {
-                ForEach(days) { d in
-                    BarMark(
-                        x: .value("日期", Fmt.dayKeyToDate(d.day), unit: .day),
-                        y: .value("成本", d.claude.costUSD)
-                    )
-                    .foregroundStyle(by: .value("来源", "Claude"))
-                    .cornerRadius(2.5)
-                    BarMark(
-                        x: .value("日期", Fmt.dayKeyToDate(d.day), unit: .day),
-                        y: .value("成本", d.codex.costUSD)
-                    )
-                    .foregroundStyle(by: .value("来源", "Codex"))
-                    .cornerRadius(2.5)
+            if showClaude || showCodex {
+                Chart {
+                    ForEach(days) { d in
+                        if showClaude {
+                            BarMark(
+                                x: .value("日期", Fmt.dayKeyToDate(d.day), unit: .day),
+                                y: .value("成本", d.claude.costUSD)
+                            )
+                            .foregroundStyle(by: .value("来源", "Claude"))
+                            .cornerRadius(2.5)
+                        }
+                        if showCodex {
+                            BarMark(
+                                x: .value("日期", Fmt.dayKeyToDate(d.day), unit: .day),
+                                y: .value("成本", d.codex.costUSD)
+                            )
+                            .foregroundStyle(by: .value("来源", "Codex"))
+                            .cornerRadius(2.5)
+                        }
+                    }
+                    if let selection,
+                       let d = day(at: selection) {
+                        RuleMark(x: .value("选中", Fmt.dayKeyToDate(d.day), unit: .day))
+                            .foregroundStyle(.quaternary)
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                    }
                 }
-                if let selection,
-                   let d = day(at: selection) {
-                    RuleMark(x: .value("选中", Fmt.dayKeyToDate(d.day), unit: .day))
-                        .foregroundStyle(.quaternary)
-                        .lineStyle(StrokeStyle(lineWidth: 1))
+                .chartForegroundStyleScale(domain: ["Claude", "Codex"],
+                                           range: [Palette.claude, Palette.codex])
+                .chartXSelection(value: $selection)
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day, count: max(days.count / 4, 2))) { _ in
+                        AxisValueLabel(format: .dateTime.month(.defaultDigits).day())
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            .chartForegroundStyleScale(domain: ["Claude", "Codex"],
-                                       range: [Palette.claude, Palette.codex])
-            .chartXSelection(value: $selection)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: max(days.count / 4, 2))) { _ in
-                    AxisValueLabel(format: .dateTime.month(.defaultDigits).day())
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .chartYAxis {
-                AxisMarks { value in
-                    AxisGridLine()
-                        .foregroundStyle(.quaternary)
-                    AxisValueLabel {
-                        if let v = value.as(Double.self) {
-                            Text(Fmt.usd(v)).font(.caption2)
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                            .foregroundStyle(.quaternary)
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) {
+                                Text(Fmt.usd(v)).font(.caption2)
+                            }
                         }
                     }
                 }
+                .frame(height: 180)
+            } else {
+                Text("> 用量来源均已隐藏，可在设置中重新开启")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Palette.muted)
+                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
             }
-            .frame(height: 180)
         }
     }
 
@@ -282,10 +368,15 @@ struct TrendChart: View {
 
     private var headerText: String {
         guard let selection, let d = day(at: selection) else {
-            let total = days.reduce(0) { $0 + $1.totalCost }
+            let total = days.reduce(0) {
+                $0 + $1.visibleCost(showClaude: showClaude, showCodex: showCodex)
+            }
             return "近 \(days.count) 天合计 \(Fmt.usd(total))"
         }
-        return "\(Fmt.shortDay(d.day))  Claude \(Fmt.usd(d.claude.costUSD)) · Codex \(Fmt.usd(d.codex.costUSD))"
+        var parts: [String] = []
+        if showClaude { parts.append("Claude \(Fmt.usd(d.claude.costUSD))") }
+        if showCodex { parts.append("Codex \(Fmt.usd(d.codex.costUSD))") }
+        return "\(Fmt.shortDay(d.day))  \(parts.joined(separator: " · "))"
     }
 }
 
