@@ -46,6 +46,7 @@ struct MainWindow: View {
 
                 Button {
                     openSettings()
+                    NSApp.activate(ignoringOtherApps: true)
                 } label: {
                     Image(systemName: "gearshape")
                 }

@@ -17,6 +17,7 @@
   - Codex：会话日志内记录的 `rate_limits` 官方快照（used_percent / resets_at / 套餐）。
   - Claude：Claude Code 的 OAuth 凭据调用 `api.anthropic.com/api/oauth/usage`（macOS 读钥匙串，Windows 读 `~/.claude/.credentials.json`）。
 - **用量统计**：解析 `~/.claude/projects/**/*.jsonl` 与 `~/.codex/sessions/**/*.jsonl`，按天 / 模型 / 项目 / 会话汇总 token 与成本（LiteLLM 在线价格表 + 内置兜底价，缓存 24 小时）。
+- **项目用量排名**：主界面显示前 5 个项目，小组件同步显示前 2 个项目；排名自动遵循 Claude / Codex 显示开关。
 - **官方窗口**：Codex 的 5 小时窗口与周度窗口并行展示；两者独立恢复，不互相替代。
 - **全球重置预测**：codex-reset.com 的 `/api/forecast`，显示未来 24/48 小时预测，可在设置中关闭。
 - **双风格小组件**：iOS 提供 App 风格与 iOS 26 液态玻璃风格并支持锁屏；Android 提供 App 风格与 Material You 系统风格。

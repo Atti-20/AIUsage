@@ -464,6 +464,27 @@ class UsageSnapshot {
     required bool showCodex,
   }) => source == 'claude' ? showClaude : showCodex;
 
+  List<ProjectStat> visibleProjects({
+    required bool showClaude,
+    required bool showCodex,
+  }) {
+    final visible = projects
+        .where(
+          (project) => isSourceVisible(
+            project.source,
+            showClaude: showClaude,
+            showCodex: showCodex,
+          ),
+        )
+        .toList();
+    visible.sort((left, right) {
+      final byCost = right.tally.costUSD.compareTo(left.tally.costUSD);
+      if (byCost != 0) return byCost;
+      return right.tally.totalTokens.compareTo(left.tally.totalTokens);
+    });
+    return visible;
+  }
+
   List<DailyStat> recentDays(int n) =>
       days.length <= n ? days : days.sublist(days.length - n);
 

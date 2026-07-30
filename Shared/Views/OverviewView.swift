@@ -56,6 +56,26 @@ struct OverviewView: View {
                 if showClaudeUsage || showCodexUsage {
                     costHero
 
+                    if !visibleProjects.isEmpty {
+                        Card(title: "项目用量排名") {
+                            VStack(spacing: 0) {
+                                ForEach(
+                                    Array(visibleProjects.prefix(5).enumerated()),
+                                    id: \.element.id
+                                ) { index, project in
+                                    ProjectRow(
+                                        project: project,
+                                        maxCost: visibleProjects.first?.tally.costUSD ?? 0,
+                                        rank: index + 1
+                                    )
+                                    if index < min(visibleProjects.count, 5) - 1 {
+                                        Divider().overlay(Palette.line)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Card(title: "近 30 天") {
                         TrendChart(
                             days: snapshot.recentDays(30),
@@ -140,6 +160,13 @@ struct OverviewView: View {
 
     private var visibleMonthCost: Double {
         snapshot.visibleMonthCost(
+            showClaude: showClaudeUsage,
+            showCodex: showCodexUsage
+        )
+    }
+
+    private var visibleProjects: [ProjectStat] {
+        snapshot.visibleProjects(
             showClaude: showClaudeUsage,
             showCodex: showCodexUsage
         )

@@ -149,6 +149,9 @@ private struct UsageWidgetRoot: View {
                     .foregroundStyle(homeSecondary)
             }
             Spacer(minLength: 0)
+            if let project = rankedProjects.first {
+                compactProject(project, rank: 1)
+            }
             homeCost
         }
         .foregroundStyle(homePrimary)
@@ -156,37 +159,70 @@ private struct UsageWidgetRoot: View {
     }
 
     private var homeMediumView: some View {
-        HStack(spacing: 16) {
-            ForEach(Array(visibleLimits.prefix(2)), id: \.window.id) { limit in
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(homeTint(for: limit.source))
-                            .frame(width: 7, height: 7)
-                        Text(limit.source.displayName)
-                            .font(.caption.weight(.semibold))
+        VStack(spacing: 8) {
+            HStack(spacing: 16) {
+                ForEach(Array(visibleLimits.prefix(2)), id: \.window.id) { limit in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(homeTint(for: limit.source))
+                                .frame(width: 7, height: 7)
+                            Text(limit.source.displayName)
+                                .font(.caption.weight(.semibold))
+                        }
+                        Text(Fmt.percent(limit.window.utilization))
+                            .font(.title2.bold().monospacedDigit())
+                        Text(limit.window.resetsAt.map(Fmt.countdown) ?? limit.window.label)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(homeSecondary)
                     }
-                    Text(Fmt.percent(limit.window.utilization))
-                        .font(.title2.bold().monospacedDigit())
-                    Text(limit.window.resetsAt.map(Fmt.countdown) ?? limit.window.label)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(homeSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                if visibleLimits.isEmpty {
+                    Label(entry.snapshot == nil ? "打开 App 同步" : "用量显示已关闭",
+                          systemImage: entry.snapshot == nil ? "icloud.and.arrow.down" : "eye.slash")
+                        .font(.caption)
+                        .foregroundStyle(homeSecondary)
+                        .frame(maxWidth: .infinity)
+                }
+                Divider().overlay(homeSecondary.opacity(0.35))
+                homeCost
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if visibleLimits.isEmpty {
-                Label(entry.snapshot == nil ? "打开 App 同步" : "用量显示已关闭",
-                      systemImage: entry.snapshot == nil ? "icloud.and.arrow.down" : "eye.slash")
-                    .font(.caption)
-                    .foregroundStyle(homeSecondary)
-                    .frame(maxWidth: .infinity)
+            if !rankedProjects.isEmpty {
+                Divider().overlay(homeSecondary.opacity(0.28))
+                HStack(spacing: 12) {
+                    ForEach(
+                        Array(rankedProjects.prefix(2).enumerated()),
+                        id: \.element.id
+                    ) { index, project in
+                        compactProject(project, rank: index + 1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
-            Divider().overlay(homeSecondary.opacity(0.35))
-            homeCost
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .foregroundStyle(homePrimary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func compactProject(_ project: ProjectStat, rank: Int) -> some View {
+        HStack(spacing: 4) {
+            Text("#\(rank)")
+                .font(.caption2.weight(.semibold).monospacedDigit())
+                .foregroundStyle(homeSecondary)
+            Circle()
+                .fill(homeTint(for: project.source))
+                .frame(width: 5, height: 5)
+            Text("\(project.name) · \(project.source.displayName)")
+                .font(.caption2.weight(.medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 2)
+            Text(Fmt.usd(project.tally.costUSD))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(homeSecondary)
+        }
     }
 
     private var homeCost: some View {
@@ -205,7 +241,8 @@ private struct UsageWidgetRoot: View {
     private var inlineView: some View {
         let percent = primaryLimit.map { Fmt.percent($0.window.utilization) } ?? "—"
         let reset = primaryLimit?.window.resetsAt.map(Fmt.countdown) ?? "等待同步"
-        return Label("\(percent) · \(reset)", systemImage: "gauge.with.dots.needle.67percent")
+        let detail = rankedProjects.first.map { "#1 \($0.name)" } ?? reset
+        return Label("\(percent) · \(detail)", systemImage: "gauge.with.dots.needle.67percent")
     }
 
     private var circularView: some View {
@@ -232,8 +269,14 @@ private struct UsageWidgetRoot: View {
                 EmptyView()
             }
             .gaugeStyle(.accessoryLinear)
-            Text(primaryLimit?.window.resetsAt.map(Fmt.countdown) ?? "打开 App 同步")
-                .font(.caption2.monospacedDigit())
+            HStack(spacing: 5) {
+                Text(rankedProjects.first.map { "#1 \($0.name)" } ?? "打开 App 同步")
+                    .lineLimit(1)
+                Spacer(minLength: 2)
+                Text(primaryLimit?.window.resetsAt.map(Fmt.countdown) ?? "—")
+                    .monospacedDigit()
+            }
+            .font(.caption2)
         }
         .widgetAccentable()
     }
@@ -263,6 +306,13 @@ private struct UsageWidgetRoot: View {
 
     private var primaryLimit: (source: UsageSource, window: LimitWindow)? {
         visibleLimits.first
+    }
+
+    private var rankedProjects: [ProjectStat] {
+        entry.snapshot?.visibleProjects(
+            showClaude: showClaudeUsage,
+            showCodex: showCodexUsage
+        ) ?? []
     }
 
     private var todayCost: Double {

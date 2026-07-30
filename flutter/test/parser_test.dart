@@ -70,6 +70,42 @@ void main() {
     expect(snap.visibleTotalCost(showClaude: true, showCodex: true), 10);
   });
 
+  test('项目用量排名遵循来源开关并按成本排序', () {
+    final snap = UsageSnapshot(
+      generatedAt: DateTime.now(),
+      deviceName: 'test',
+      projects: [
+        ProjectStat(
+          'Claude Project',
+          '/claude',
+          'claude',
+          TokenTally(costUSD: 8),
+          2,
+          null,
+        ),
+        ProjectStat(
+          'Codex Project',
+          '/codex',
+          'codex',
+          TokenTally(costUSD: 12),
+          3,
+          null,
+        ),
+      ],
+    );
+
+    expect(
+      snap
+          .visibleProjects(showClaude: true, showCodex: true)
+          .map((project) => project.name),
+      ['Codex Project', 'Claude Project'],
+    );
+    expect(
+      snap.visibleProjects(showClaude: true, showCodex: false).single.name,
+      'Claude Project',
+    );
+  });
+
   test('Codex 5 小时与周度窗口保持并行显示', () {
     expect(LocalParser.windowLabel(300, '主限额'), '5 小时窗口');
     expect(LocalParser.windowLabel(10080, '次限额'), '周限额');

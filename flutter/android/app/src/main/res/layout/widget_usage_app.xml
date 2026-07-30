@@ -108,6 +108,84 @@
             android:textSize="9sp" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/project_ranking"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="> PROJECT RANK"
+            android:textColor="@color/widget_app_muted"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/project_row_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/project_name_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="#1 Project"
+                android:textColor="@color/widget_app_text"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/project_cost_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="$0.00"
+                android:textColor="@color/widget_app_muted"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/project_row_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/project_name_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="#2 Project"
+                android:textColor="@color/widget_app_text"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/project_cost_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="$0.00"
+                android:textColor="@color/widget_app_muted"
+                android:textSize="9sp" />
+        </LinearLayout>
+    </LinearLayout>
+
     <TextView
         android:id="@+id/empty_state"
         android:layout_width="match_parent"

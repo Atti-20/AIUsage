@@ -31,5 +31,12 @@ struct AIUsageMacApp: App {
                 .frame(minWidth: 760, minHeight: 520)
         }
         .defaultSize(width: 900, height: 640)
+
+        Settings {
+            SettingsView()
+                .environmentObject(store)
+                .preferredColorScheme(.dark)
+                .frame(minWidth: 520, minHeight: 460)
+        }
     }
 }

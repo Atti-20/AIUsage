@@ -25,6 +25,13 @@ class DashboardPage extends StatelessWidget {
           ),
         )
         .toList();
+    final projects = snapshot
+        .visibleProjects(
+          showClaude: store.showClaudeUsage,
+          showCodex: store.showCodexUsage,
+        )
+        .take(5)
+        .toList();
     return RefreshIndicator(
       onRefresh: store.refresh,
       child: ListView(
@@ -110,6 +117,24 @@ class DashboardPage extends StatelessWidget {
           if (store.showClaudeUsage || store.showCodexUsage) ...[
             _costHero(context, snapshot),
             const SizedBox(height: 12),
+            if (projects.isNotEmpty) ...[
+              AppCard(
+                title: '项目用量排名',
+                child: Column(
+                  children: [
+                    for (final (index, project) in projects.indexed) ...[
+                      ProjectRow(
+                        project: project,
+                        maxCost: projects.first.tally.costUSD,
+                        rank: index + 1,
+                      ),
+                      if (index < projects.length - 1) const Divider(height: 1),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             AppCard(
               title: '近 30 天',
               child: TrendChart(

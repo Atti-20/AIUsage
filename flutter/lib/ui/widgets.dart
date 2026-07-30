@@ -688,7 +688,13 @@ class _DonutPainter extends CustomPainter {
 class ProjectRow extends StatelessWidget {
   final ProjectStat project;
   final double maxCost;
-  const ProjectRow({super.key, required this.project, required this.maxCost});
+  final int? rank;
+  const ProjectRow({
+    super.key,
+    required this.project,
+    required this.maxCost,
+    this.rank,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -703,6 +709,20 @@ class ProjectRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (rank != null) ...[
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '#${rank!.toString().padLeft(2, '0')}',
+                    style: const TextStyle(
+                      color: Palette.muted,
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               Container(
                 width: 7,
                 height: 7,
@@ -710,11 +730,26 @@ class ProjectRow extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  project.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      project.source == 'claude' ? 'Claude' : 'Codex',
+                      style: const TextStyle(
+                        color: Palette.muted,
+                        fontFamily: 'monospace',
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(

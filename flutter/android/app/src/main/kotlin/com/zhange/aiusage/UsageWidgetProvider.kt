@@ -67,6 +67,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
                 R.id.codex_reset,
                 R.id.codex_progress,
             )
+            bindProjects(views, root, showClaude, showCodex)
 
             if (root == null) {
                 views.setViewVisibility(R.id.empty_state, View.VISIBLE)
@@ -116,6 +117,88 @@ class UsageWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(percentID, "${utilization.toInt()}%")
             views.setTextViewText(resetID, countdown(window.optString("resetsAt")))
             views.setProgressBar(progressID, 100, utilization.toInt(), false)
+        }
+
+        private data class RankedProject(
+            val name: String,
+            val source: String,
+            val cost: Double,
+            val tokens: Long,
+        )
+
+        private fun bindProjects(
+            views: RemoteViews,
+            root: JSONObject?,
+            showClaude: Boolean,
+            showCodex: Boolean,
+        ) {
+            val projects = root?.optJSONArray("projects")
+            val ranked = buildList {
+                if (projects != null) {
+                    for (index in 0 until projects.length()) {
+                        val project = projects.optJSONObject(index) ?: continue
+                        val source = project.optString("source")
+                        if ((source == "claude" && !showClaude) ||
+                            (source == "codex" && !showCodex)
+                        ) {
+                            continue
+                        }
+                        val tally = project.optJSONObject("tally") ?: JSONObject()
+                        add(
+                            RankedProject(
+                                name = project.optString("name").ifBlank { "未知项目" },
+                                source = if (source == "claude") "Claude" else "Codex",
+                                cost = tally.optDouble("costUSD", 0.0),
+                                tokens = tally.optLong("input", 0) +
+                                    tally.optLong("output", 0) +
+                                    tally.optLong("cacheRead", 0) +
+                                    tally.optLong("cacheWrite", 0),
+                            ),
+                        )
+                    }
+                }
+            }.sortedWith(
+                compareByDescending<RankedProject> { it.cost }
+                    .thenByDescending { it.tokens },
+            )
+
+            views.setViewVisibility(
+                R.id.project_ranking,
+                if (ranked.isEmpty()) View.GONE else View.VISIBLE,
+            )
+            bindProjectRow(
+                views,
+                ranked.getOrNull(0),
+                1,
+                R.id.project_row_1,
+                R.id.project_name_1,
+                R.id.project_cost_1,
+            )
+            bindProjectRow(
+                views,
+                ranked.getOrNull(1),
+                2,
+                R.id.project_row_2,
+                R.id.project_name_2,
+                R.id.project_cost_2,
+            )
+        }
+
+        private fun bindProjectRow(
+            views: RemoteViews,
+            project: RankedProject?,
+            rank: Int,
+            rowID: Int,
+            nameID: Int,
+            costID: Int,
+        ) {
+            if (project == null) {
+                views.setViewVisibility(rowID, View.GONE)
+                return
+            }
+            views.setViewVisibility(rowID, View.VISIBLE)
+            views.setTextViewText(nameID, "#$rank ${project.name} · ${project.source}")
+            views.setTextViewText(costID, usd(project.cost))
         }
 
         private fun visibleCosts(

@@ -449,14 +449,24 @@ func shortModelName(_ model: String) -> String {
 struct ProjectRow: View {
     var project: ProjectStat
     var maxCost: Double
+    var rank: Int? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
+                if let rank {
+                    Text(String(format: "#%02d", rank))
+                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: 28, alignment: .leading)
+                }
                 Circle().fill(Palette.color(for: project.source)).frame(width: 7, height: 7)
                 Text(project.name)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
+                Text(project.source.displayName)
+                    .font(.caption2)
+                    .foregroundStyle(Palette.muted)
                 Spacer()
                 Text(Fmt.usd(project.tally.costUSD))
                     .font(.callout.weight(.semibold))

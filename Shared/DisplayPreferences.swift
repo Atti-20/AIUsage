@@ -14,6 +14,23 @@ extension DailyStat {
 }
 
 extension UsageSnapshot {
+    func visibleProjects(showClaude: Bool, showCodex: Bool) -> [ProjectStat] {
+        projects
+            .filter {
+                isSourceVisible(
+                    $0.source,
+                    showClaude: showClaude,
+                    showCodex: showCodex
+                )
+            }
+            .sorted {
+                if $0.tally.costUSD != $1.tally.costUSD {
+                    return $0.tally.costUSD > $1.tally.costUSD
+                }
+                return $0.tally.totalTokens > $1.tally.totalTokens
+            }
+    }
+
     func visibleMonthCost(showClaude: Bool, showCodex: Bool) -> Double {
         let prefix = String(Self.todayKey.prefix(7))
         return days
