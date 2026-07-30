@@ -22,7 +22,16 @@ jobs:
         run: >
           xcodebuild -project AIUsage.xcodeproj -scheme AIUsage
           -configuration Release -derivedDataPath build
+          ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO build
+      - name: Smoke launch macOS app
+        run: |
+          app="build/Build/Products/Release/AIUsage.app"
+          test "$(plutil -extract LSUIElement raw "$app/Contents/Info.plist")" = "false"
+          open -n "$app"
+          sleep 5
+          pgrep -f "$app/Contents/MacOS/AIUsage"
+          pkill -f "$app/Contents/MacOS/AIUsage"
       - name: Package macOS dmg & zip
         run: |
           mkdir -p dist

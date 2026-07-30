@@ -22,7 +22,7 @@ targets:
       path: macOS/Info.plist
       properties:
         CFBundleDisplayName: AI 用量
-        LSUIElement: true
+        LSUIElement: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zhange.aiusage

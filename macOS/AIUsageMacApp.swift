@@ -7,6 +7,15 @@ struct AIUsageMacApp: App {
     @AppStorage(DisplayPreferenceKeys.showCodexUsage) private var showCodexUsage = true
 
     var body: some Scene {
+        Window("AI 用量", id: "main") {
+            MainWindow()
+                .environmentObject(store)
+                .preferredColorScheme(.dark)
+                .frame(minWidth: 760, minHeight: 520)
+                .task { store.startIfNeeded() }
+        }
+        .defaultSize(width: 900, height: 640)
+
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(store)
@@ -23,14 +32,6 @@ struct AIUsageMacApp: App {
             .task { store.startIfNeeded() }
         }
         .menuBarExtraStyle(.window)
-
-        Window("AI 用量", id: "main") {
-            MainWindow()
-                .environmentObject(store)
-                .preferredColorScheme(.dark)
-                .frame(minWidth: 760, minHeight: 520)
-        }
-        .defaultSize(width: 900, height: 640)
 
         Settings {
             SettingsView()
