@@ -103,6 +103,7 @@ private struct UsageWidgetRoot: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         if style == .glass {
+#if compiler(>=6.2)
             if #available(iOSApplicationExtension 26.0, *) {
                 content()
                     .padding(2)
@@ -111,6 +112,10 @@ private struct UsageWidgetRoot: View {
                 content()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
             }
+#else
+            content()
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+#endif
         } else {
             content()
         }
