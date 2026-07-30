@@ -8,6 +8,7 @@ struct AIUsageMacApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(store)
+                .preferredColorScheme(.dark)
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "gauge.with.needle")
@@ -21,6 +22,7 @@ struct AIUsageMacApp: App {
         Window("AI 用量", id: "main") {
             MainWindow()
                 .environmentObject(store)
+                .preferredColorScheme(.dark)
                 .frame(minWidth: 760, minHeight: 520)
         }
         .defaultSize(width: 900, height: 640)

@@ -71,5 +71,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(Palette.canvas)
+        .tint(Palette.signal)
     }
 }

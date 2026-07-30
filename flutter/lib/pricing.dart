@@ -7,7 +7,12 @@ import 'models.dart';
 
 class ModelPrice {
   final double input, output, cacheRead, cacheWrite; // USD / MTok
-  const ModelPrice(this.input, this.output, [this.cacheRead = 0, this.cacheWrite = 0]);
+  const ModelPrice(
+    this.input,
+    this.output, [
+    this.cacheRead = 0,
+    this.cacheWrite = 0,
+  ]);
 }
 
 /// 定价：内置表兜底 + LiteLLM 在线价格表（缓存 24 小时）。
@@ -41,7 +46,8 @@ class Pricing {
     String? bestKey;
     ModelPrice? bestPrice;
     _remote.forEach((k, p) {
-      if ((m.contains(k) || k.contains(m)) && (bestKey == null || k.length > bestKey!.length)) {
+      if ((m.contains(k) || k.contains(m)) &&
+          (bestKey == null || k.length > bestKey!.length)) {
         bestKey = k;
         bestPrice = p;
       }
@@ -55,26 +61,41 @@ class Pricing {
 
   double cost(String model, TokenTally t) {
     final p = priceFor(model);
-    return (t.input * p.input + t.output * p.output + t.cacheRead * p.cacheRead + t.cacheWrite * p.cacheWrite) / 1e6;
+    return (t.input * p.input +
+            t.output * p.output +
+            t.cacheRead * p.cacheRead +
+            t.cacheWrite * p.cacheWrite) /
+        1e6;
   }
 
   static File get _cacheFile {
-    final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.';
+    final home =
+        Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '.';
     return File('$home/.aiusage/litellm-prices.json');
   }
 
   Future<void> loadRemoteIfNeeded() async {
-    if (_loadedAt != null && DateTime.now().difference(_loadedAt!).inHours < 1) return;
+    if (_loadedAt != null &&
+        DateTime.now().difference(_loadedAt!).inHours < 1) {
+      return;
+    }
     final cache = _cacheFile;
     try {
-      if (cache.existsSync() && DateTime.now().difference(cache.lastModifiedSync()).inHours < 24) {
+      if (cache.existsSync() &&
+          DateTime.now().difference(cache.lastModifiedSync()).inHours < 24) {
         _apply(cache.readAsStringSync());
         return;
       }
     } catch (_) {}
     try {
       final resp = await http
-          .get(Uri.parse('https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'))
+          .get(
+            Uri.parse(
+              'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
+            ),
+          )
           .timeout(const Duration(seconds: 20));
       if (resp.statusCode == 200) {
         cache.parent.createSync(recursive: true);
@@ -97,8 +118,10 @@ class Pricing {
       final inCost = (value['input_cost_per_token'] as num?)?.toDouble();
       final outCost = (value['output_cost_per_token'] as num?)?.toDouble();
       if (inCost == null || outCost == null) return;
-      final cr = (value['cache_read_input_token_cost'] as num?)?.toDouble() ?? 0;
-      final cw = (value['cache_creation_input_token_cost'] as num?)?.toDouble() ?? 0;
+      final cr =
+          (value['cache_read_input_token_cost'] as num?)?.toDouble() ?? 0;
+      final cw =
+          (value['cache_creation_input_token_cost'] as num?)?.toDouble() ?? 0;
       final bare = key.toLowerCase().split('/').last;
       table[bare] = ModelPrice(inCost * 1e6, outCost * 1e6, cr * 1e6, cw * 1e6);
     });

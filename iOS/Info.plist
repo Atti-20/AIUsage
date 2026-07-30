@@ -33,5 +33,12 @@
 	<string>用于在局域网内连接 Mac 上的「AI 用量」应用同步用量数据</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 </dict>
 </plist>

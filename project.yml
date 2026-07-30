@@ -46,6 +46,11 @@ targets:
       properties:
         CFBundleDisplayName: AI 用量
         UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         NSLocalNetworkUsageDescription: 用于在局域网内连接 Mac 上的「AI 用量」应用同步用量数据
         NSBonjourServices:
           - _aiusage._tcp
@@ -78,3 +83,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.zhange.aiusage.ios.widget
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
+schemes:
+  AIUsage:
+    build:
+      targets:
+        AIUsage: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  AIUsageiOS:
+    build:
+      targets:
+        AIUsageiOS: all
+        AIUsageWidget: all
+    run:
+      config: Debug
+    archive:
+      config: Release

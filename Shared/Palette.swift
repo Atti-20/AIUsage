@@ -37,30 +37,38 @@ private extension UIColor {
 }
 #endif
 
-/// 图表配色。浅色 #CE6A2C/#2E7DE1、深色 #D4711F/#4C8BE8，
-/// 已通过 CVD 区分度与表面对比度校验，固定分配、不轮换。
+/// 终端仪表盘设计系统。深色方案借鉴 codex-reset.com 的高对比数据界面，
+/// 浅色方案保留相同语义，供小组件与系统强制浅色场景使用。
 enum Palette {
-    static let claude = dynamicColor(light: 0xCE6A2C, dark: 0xD4711F)
-    static let codex = dynamicColor(light: 0x2E7DE1, dark: 0x4C8BE8)
+    static let canvas = dynamicColor(light: 0xF4F7F5, dark: 0x0B0F0D)
+    static let surface = dynamicColor(light: 0xFFFFFF, dark: 0x101713)
+    static let surfaceRaised = dynamicColor(light: 0xEDF3EF, dark: 0x141E18)
+    static let line = dynamicColor(light: 0xCBD8D0, dark: 0x26362C)
+    static let ink = dynamicColor(light: 0x152019, dark: 0xE8EEE9)
+    static let muted = dynamicColor(light: 0x5E6D64, dark: 0x87938B)
+    static let signal = dynamicColor(light: 0x16813A, dark: 0x69F08A)
+    static let warning = dynamicColor(light: 0x9A5A11, dark: 0xE5A965)
+    static let danger = dynamicColor(light: 0xB63232, dark: 0xFF7777)
 
-    /// 模型占比等多分类场景的固定顺序色板（按成本降序分配）。
+    static let claude = dynamicColor(light: 0xA95525, dark: 0xE08A52)
+    static let codex = signal
+
     static let categorical: [Color] = [
         claude,
         codex,
-        dynamicColor(light: 0x7A5AF8, dark: 0x8E76F5),
-        dynamicColor(light: 0x0F866C, dark: 0x2AA187),
-        dynamicColor(light: 0x9A7B00, dark: 0xAD8F1F),
-        dynamicColor(light: 0x8A8A85, dark: 0x9A9A94),
+        dynamicColor(light: 0x5E4DB2, dark: 0xA895FF),
+        dynamicColor(light: 0x14796A, dark: 0x4BC6AE),
+        dynamicColor(light: 0x8B6A09, dark: 0xE0BE54),
+        muted,
     ]
 
     static func color(for source: UsageSource) -> Color {
         source == .claude ? claude : codex
     }
 
-    /// 限额环上的用量文字颜色：>90% 红、>70% 橙、否则常规。
     static func utilizationText(_ percent: Double) -> Color {
-        if percent >= 90 { return .red }
-        if percent >= 70 { return .orange }
-        return .primary
+        if percent >= 90 { return danger }
+        if percent >= 70 { return warning }
+        return signal
     }
 }

@@ -14,7 +14,8 @@ import 'pricing.dart';
 /// 桌面角色（Windows/macOS/Linux）：本地解析 + 官方限额 + 重置动态 + 局域网服务。
 /// 移动角色（Android）：局域网发现/手动地址拉取 + 本地缓存 + 重置动态。
 class AppStore extends ChangeNotifier {
-  static bool get isDesktopRole => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  static bool get isDesktopRole =>
+      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   UsageSnapshot? snapshot;
   List<ResetEvent>? freshResets;
@@ -36,7 +37,9 @@ class AppStore extends ChangeNotifier {
     final cached = _prefs?.getString('snapshotCache');
     if (cached != null) {
       try {
-        snapshot = UsageSnapshot.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+        snapshot = UsageSnapshot.fromJson(
+          jsonDecode(cached) as Map<String, dynamic>,
+        );
       } catch (_) {}
     }
     notifyListeners();
@@ -84,7 +87,9 @@ class AppStore extends ChangeNotifier {
 
     final claudeFuture = ClaudeOAuth.fetch();
     final resetsFuture = ResetsClient.fetch().catchError((_) => <ResetEvent>[]);
-    final snap = await compute(_parseInBackground, null) ?? await LocalParser(Pricing.shared).parseAll();
+    final snap =
+        await compute(_parseInBackground, null) ??
+        await LocalParser(Pricing.shared).parseAll();
 
     snap.claudeLimits = await claudeFuture;
     snap.resets = (await resetsFuture).take(60).toList();

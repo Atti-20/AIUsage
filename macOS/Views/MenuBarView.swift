@@ -6,7 +6,19 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 5) {
+                    Text("~/")
+                        .foregroundStyle(Palette.signal)
+                    Text("AIUsage")
+                        .foregroundStyle(Palette.ink)
+                }
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                Spacer()
+                StatusPill(text: "LOCAL")
+            }
+
             if let snapshot = store.snapshot {
                 HStack(spacing: 16) {
                     ForEach(Array(snapshot.allLimitWindows.prefix(3)), id: \.window.id) { item in
@@ -15,8 +27,8 @@ struct MenuBarView: View {
                                       tint: Palette.color(for: item.source),
                                       lineWidth: 6, size: 48)
                             Text("\(item.source.displayName) \(item.window.label)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(Palette.muted)
                                 .lineLimit(1)
                         }
                     }
@@ -27,27 +39,27 @@ struct MenuBarView: View {
 
                 Grid(alignment: .leading, verticalSpacing: 4) {
                     GridRow {
-                        Text("今日").foregroundStyle(.secondary)
+                        Text("TODAY COST").foregroundStyle(Palette.muted)
                         Text(Fmt.usd(snapshot.today.totalCost)).gridColumnAlignment(.trailing)
                     }
                     GridRow {
-                        Text("本月").foregroundStyle(.secondary)
+                        Text("MONTH").foregroundStyle(Palette.muted)
                         Text(Fmt.usd(snapshot.monthCost))
                     }
                     if let last = ResetStats.compute(from: snapshot.resets).lastReset {
                         GridRow {
-                            Text("Codex 重置").foregroundStyle(.secondary)
+                            Text("GLOBAL RESET").foregroundStyle(Palette.muted)
                             Text(Fmt.relative(last))
                         }
                     }
                 }
-                .font(.callout.monospacedDigit())
+                .font(.system(size: 11, design: .monospaced).monospacedDigit())
             } else {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text(store.isRefreshing ? "正在解析用量数据…" : "暂无数据")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    Text(store.isRefreshing ? "> 正在解析用量数据…" : "> 暂无数据")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
                 }
                 .frame(maxWidth: .infinity, minHeight: 60)
             }
@@ -83,6 +95,8 @@ struct MenuBarView: View {
             .buttonStyle(.borderless)
         }
         .padding(14)
-        .frame(width: 300)
+        .frame(width: 320)
+        .background(Palette.canvas)
+        .tint(Palette.signal)
     }
 }

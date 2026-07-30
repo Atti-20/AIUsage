@@ -14,7 +14,10 @@ class LocalParser {
   final Pricing pricing;
   LocalParser(this.pricing);
 
-  static String get home => Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.';
+  static String get home =>
+      Platform.environment['USERPROFILE'] ??
+      Platform.environment['HOME'] ??
+      '.';
 
   Future<UsageSnapshot> parseAll() async {
     final b = _Builder();
@@ -56,8 +59,12 @@ class LocalParser {
         continue;
       }
       final type = obj['type'];
-      if (projectPath.isEmpty && obj['cwd'] is String) projectPath = obj['cwd'] as String;
-      if (type == 'summary' && obj['summary'] is String && (obj['summary'] as String).isNotEmpty) {
+      if (projectPath.isEmpty && obj['cwd'] is String) {
+        projectPath = obj['cwd'] as String;
+      }
+      if (type == 'summary' &&
+          obj['summary'] is String &&
+          (obj['summary'] as String).isNotEmpty) {
         title = obj['summary'] as String;
         continue;
       }
@@ -81,12 +88,16 @@ class LocalParser {
         input: (usage['input_tokens'] as num?)?.toInt() ?? 0,
         output: (usage['output_tokens'] as num?)?.toInt() ?? 0,
         cacheRead: (usage['cache_read_input_tokens'] as num?)?.toInt() ?? 0,
-        cacheWrite: (usage['cache_creation_input_tokens'] as num?)?.toInt() ?? 0,
+        cacheWrite:
+            (usage['cache_creation_input_tokens'] as num?)?.toInt() ?? 0,
       );
-      tally.costUSD = (obj['costUSD'] as num?)?.toDouble() ?? pricing.cost(model, tally);
+      tally.costUSD =
+          (obj['costUSD'] as num?)?.toDouble() ?? pricing.cost(model, tally);
 
       final date = parseDate(obj['timestamp']) ?? DateTime.now();
-      if (lastActivity == null || date.isAfter(lastActivity)) lastActivity = date;
+      if (lastActivity == null || date.isAfter(lastActivity)) {
+        lastActivity = date;
+      }
 
       b.add(dayKey(date), 'claude', model, tally);
       sessionTally.add(tally);
@@ -94,15 +105,30 @@ class LocalParser {
 
     if (sessionTally.isEmpty) return;
     final sessionID = file.uri.pathSegments.last.replaceAll('.jsonl', '');
-    final projectName = projectPath.isEmpty ? '未知项目' : projectPath.split(Platform.pathSeparator).last.split('/').last;
-    b.addSession(SessionStat(sessionID, projectName, 'claude', title, sessionTally, lastActivity), projectPath);
+    final projectName = projectPath.isEmpty
+        ? '未知项目'
+        : projectPath.split(Platform.pathSeparator).last.split('/').last;
+    b.addSession(
+      SessionStat(
+        sessionID,
+        projectName,
+        'claude',
+        title,
+        sessionTally,
+        lastActivity,
+      ),
+      projectPath,
+    );
   }
 
   // MARK: Codex
 
   void _parseCodex(_Builder b) {
     final cutoff = DateTime.now().subtract(const Duration(days: keepDays + 2));
-    for (final rootPath in ['$home/.codex/sessions', '$home/.codex/archived_sessions']) {
+    for (final rootPath in [
+      '$home/.codex/sessions',
+      '$home/.codex/archived_sessions',
+    ]) {
       final root = Directory(rootPath);
       if (!root.existsSync()) continue;
       for (final entity in root.listSync(recursive: true, followLinks: false)) {
@@ -145,17 +171,23 @@ class LocalParser {
         if (payload['model'] is String) model = payload['model'] as String;
       } else if (type == 'turn_context') {
         if (payload['model'] is String) model = payload['model'] as String;
-        if (projectPath.isEmpty && payload['cwd'] is String) projectPath = payload['cwd'] as String;
+        if (projectPath.isEmpty && payload['cwd'] is String) {
+          projectPath = payload['cwd'] as String;
+        }
       } else if (type == 'event_msg' && payload['type'] == 'token_count') {
         final info = payload['info'];
         if (info is Map && info['total_token_usage'] is Map) {
-          final current = _Totals.from((info['total_token_usage'] as Map).cast());
+          final current = _Totals.from(
+            (info['total_token_usage'] as Map).cast(),
+          );
           final delta = current.delta(prev);
           prev = current;
           last = current;
           if (!delta.isEmpty) {
             final date = timestamp ?? DateTime.now();
-            if (lastActivity == null || date.isAfter(lastActivity)) lastActivity = date;
+            if (lastActivity == null || date.isAfter(lastActivity)) {
+              lastActivity = date;
+            }
             delta.costUSD = pricing.cost(model ?? 'gpt-5', delta);
             sessionCost += delta.costUSD;
             b.add(dayKey(date), 'codex', model ?? 'gpt-5', delta);
@@ -163,8 +195,13 @@ class LocalParser {
         }
         final rl = payload['rate_limits'];
         if (rl is Map) {
-          final cap = _captureRateLimits(rl.cast(), timestamp ?? DateTime.now());
-          if (cap != null && (b.codexCapturedAt == null || cap.$1.isAfter(b.codexCapturedAt!))) {
+          final cap = _captureRateLimits(
+            rl.cast(),
+            timestamp ?? DateTime.now(),
+          );
+          if (cap != null &&
+              (b.codexCapturedAt == null ||
+                  cap.$1.isAfter(b.codexCapturedAt!))) {
             b.codexCapturedAt = cap.$1;
             b.codexLimits = cap.$2;
           }
@@ -174,11 +211,26 @@ class LocalParser {
 
     final sessionTally = last.tally..costUSD = sessionCost;
     if (sessionTally.isEmpty) return;
-    final projectName = projectPath.isEmpty ? '未知项目' : projectPath.split(Platform.pathSeparator).last.split('/').last;
-    b.addSession(SessionStat(sessionID, projectName, 'codex', null, sessionTally, lastActivity), projectPath);
+    final projectName = projectPath.isEmpty
+        ? '未知项目'
+        : projectPath.split(Platform.pathSeparator).last.split('/').last;
+    b.addSession(
+      SessionStat(
+        sessionID,
+        projectName,
+        'codex',
+        null,
+        sessionTally,
+        lastActivity,
+      ),
+      projectPath,
+    );
   }
 
-  (DateTime, CodexLimits)? _captureRateLimits(Map<String, dynamic> rl, DateTime at) {
+  (DateTime, CodexLimits)? _captureRateLimits(
+    Map<String, dynamic> rl,
+    DateTime at,
+  ) {
     final limitID = rl['limit_id'];
     if (limitID is String && limitID != 'codex') return null;
     final windows = <LimitWindow>[];
@@ -190,11 +242,23 @@ class LocalParser {
       final minutes = (w['window_minutes'] as num?)?.toInt();
       DateTime? resetsAt;
       if (w['resets_at'] is num) {
-        resetsAt = DateTime.fromMillisecondsSinceEpoch(((w['resets_at'] as num) * 1000).toInt());
+        resetsAt = DateTime.fromMillisecondsSinceEpoch(
+          ((w['resets_at'] as num) * 1000).toInt(),
+        );
       } else if (w['resets_in_seconds'] is num) {
-        resetsAt = at.add(Duration(seconds: (w['resets_in_seconds'] as num).toInt()));
+        resetsAt = at.add(
+          Duration(seconds: (w['resets_in_seconds'] as num).toInt()),
+        );
       }
-      windows.add(LimitWindow(key, windowLabel(minutes, fallback), used, resetsAt, minutes));
+      windows.add(
+        LimitWindow(
+          key,
+          windowLabel(minutes, fallback),
+          used,
+          resetsAt,
+          minutes,
+        ),
+      );
     }
     if (windows.isEmpty) return null;
     String? balance;
@@ -206,7 +270,15 @@ class LocalParser {
         balance = credits['balance'] as String;
       }
     }
-    return (at, CodexLimits(plan: rl['plan_type'] as String?, windows: windows, creditsBalance: balance, capturedAt: at));
+    return (
+      at,
+      CodexLimits(
+        plan: rl['plan_type'] as String?,
+        windows: windows,
+        creditsBalance: balance,
+        capturedAt: at,
+      ),
+    );
   }
 
   static String windowLabel(int? minutes, String fallback) {
@@ -233,11 +305,11 @@ class _Totals {
   }
 
   TokenTally get tally => TokenTally(
-        input: (input - cached).clamp(0, 1 << 62),
-        cacheRead: cached,
-        cacheWrite: cacheWrite,
-        output: output,
-      );
+    input: (input - cached).clamp(0, 1 << 62),
+    cacheRead: cached,
+    cacheWrite: cacheWrite,
+    output: output,
+  );
 
   TokenTally delta(_Totals prev) {
     final dInput = (input - prev.input).clamp(0, 1 << 62);
@@ -259,14 +331,18 @@ class _Builder {
   CodexLimits? codexLimits;
   DateTime? codexCapturedAt;
 
-  late final String cutoffKey =
-      dayKey(DateTime.now().subtract(const Duration(days: LocalParser.keepDays)));
+  late final String cutoffKey = dayKey(
+    DateTime.now().subtract(const Duration(days: LocalParser.keepDays)),
+  );
 
   void add(String day, String source, String model, TokenTally tally) {
     if (day.compareTo(cutoffKey) < 0) return;
     final d = perDay.putIfAbsent(day, () => DailyStat(day));
     (source == 'claude' ? d.claude : d.codex).add(tally);
-    final m = perModel.putIfAbsent('$source|$model', () => ModelStat(model, source, TokenTally()));
+    final m = perModel.putIfAbsent(
+      '$source|$model',
+      () => ModelStat(model, source, TokenTally()),
+    );
     m.tally.add(tally);
   }
 
@@ -275,19 +351,34 @@ class _Builder {
     sessions.add(session);
     final p = perProject.putIfAbsent(
       '${session.source}|$projectPath',
-      () => ProjectStat(session.project, projectPath, session.source, TokenTally(), 0, null),
+      () => ProjectStat(
+        session.project,
+        projectPath,
+        session.source,
+        TokenTally(),
+        0,
+        null,
+      ),
     );
     p.tally.add(session.tally);
     p.sessionCount += 1;
     final a = session.lastActivity;
-    if (a != null && (p.lastActivity == null || a.isAfter(p.lastActivity!))) p.lastActivity = a;
+    if (a != null && (p.lastActivity == null || a.isAfter(p.lastActivity!))) {
+      p.lastActivity = a;
+    }
   }
 
   UsageSnapshot build({required String deviceName}) {
     final days = perDay.values.toList()..sort((a, b) => a.day.compareTo(b.day));
-    final models = perModel.values.toList()..sort((a, b) => b.tally.costUSD.compareTo(a.tally.costUSD));
-    final projects = perProject.values.toList()..sort((a, b) => b.tally.costUSD.compareTo(a.tally.costUSD));
-    sessions.sort((a, b) => (b.lastActivity ?? DateTime(2000)).compareTo(a.lastActivity ?? DateTime(2000)));
+    final models = perModel.values.toList()
+      ..sort((a, b) => b.tally.costUSD.compareTo(a.tally.costUSD));
+    final projects = perProject.values.toList()
+      ..sort((a, b) => b.tally.costUSD.compareTo(a.tally.costUSD));
+    sessions.sort(
+      (a, b) => (b.lastActivity ?? DateTime(2000)).compareTo(
+        a.lastActivity ?? DateTime(2000),
+      ),
+    );
     return UsageSnapshot(
       generatedAt: DateTime.now(),
       deviceName: deviceName,

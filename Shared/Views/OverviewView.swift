@@ -1,21 +1,22 @@
 import SwiftUI
 
-/// 总览页：英雄数字 + 限额环 + 30 天趋势 + 模型/项目排行。
+/// 总览页：限额窗口优先，随后呈现成本与趋势。
 /// Mac 与 iOS 共用，数据来自 UsageSnapshot。
 struct OverviewView: View {
     var snapshot: UsageSnapshot
 
     private var ringGrid: [GridItem] {
-        [GridItem(.adaptive(minimum: 230), spacing: 12)]
+        [GridItem(.adaptive(minimum: 250), spacing: 12)]
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                heroCard
+            VStack(alignment: .leading, spacing: 18) {
+                pageHeader
 
                 let limits = snapshot.allLimitWindows
                 if !limits.isEmpty {
+                    TerminalEyebrow(text: "active limit windows")
                     LazyVGrid(columns: ringGrid, spacing: 12) {
                         ForEach(limits, id: \.window.id) { item in
                             LimitCard(source: item.source, window: item.window)
@@ -28,15 +29,17 @@ struct OverviewView: View {
                         .foregroundStyle(.orange)
                 }
 
-                Card(title: "近 30 天用量趋势") {
+                costHero
+
+                Card(title: "30 day usage signal") {
                     TrendChart(days: snapshot.recentDays(30))
                 }
 
-                HStack(alignment: .top, spacing: 12) {
-                    Card(title: "模型成本占比") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], alignment: .leading, spacing: 12) {
+                    Card(title: "model cost share") {
                         ModelDonut(models: snapshot.models)
                     }
-                    Card(title: "项目排行") {
+                    Card(title: "top projects") {
                         let projects = Array(snapshot.projects(for: nil).prefix(6))
                         let maxCost = projects.first?.tally.costUSD ?? 0
                         if projects.isEmpty {
@@ -51,55 +54,94 @@ struct OverviewView: View {
                     }
                 }
 
-                Text("更新于 \(Fmt.dateTime(snapshot.generatedAt)) · 来自 \(snapshot.deviceName)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 2)
+                HStack(spacing: 8) {
+                    Circle().fill(Palette.signal).frame(width: 5, height: 5)
+                    Text("SYNC \(Fmt.dateTime(snapshot.generatedAt))  /  \(snapshot.deviceName)")
+                }
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 4)
             }
-            .padding(16)
+            .padding(18)
+        }
+        .background(Palette.canvas)
+    }
+
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                TerminalEyebrow(text: "usage monitor / local")
+                Spacer()
+                StatusPill(text: "LIVE SNAPSHOT")
+            }
+            Text("额度还够用吗？")
+                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                .tracking(-1.2)
+                .foregroundStyle(Palette.ink)
+            Text("Claude Code 与 Codex 的限额、重置时间和本地成本汇总。原始会话始终留在你的设备上。")
+                .font(.callout)
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// 成本作为次级英雄区，避免盖过用户最关心的限额与重置时间。
+    private var costHero: some View {
+        Card(title: nil) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 24) {
+                    costPrimary
+                    Spacer(minLength: 18)
+                    HStack(spacing: 24) {
+                        quickStat("MONTH", Fmt.usd(snapshot.monthCost))
+                        quickStat("90 DAYS", Fmt.usd(snapshot.totalCost))
+                        if let last = ResetStats.compute(from: snapshot.resets).lastReset {
+                            quickStat("GLOBAL RESET", Fmt.relative(last))
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 18) {
+                    costPrimary
+                    Divider().overlay(Palette.line)
+                    HStack(spacing: 24) {
+                        quickStat("MONTH", Fmt.usd(snapshot.monthCost))
+                        quickStat("90 DAYS", Fmt.usd(snapshot.totalCost))
+                        if let last = ResetStats.compute(from: snapshot.resets).lastReset {
+                            quickStat("RESET", Fmt.relative(last))
+                        }
+                    }
+                }
+            }
         }
     }
 
-    /// 英雄卡：今日成本大数字 + 来源拆分 + 本月/累计/重置速览。
-    private var heroCard: some View {
-        Card(title: nil) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("今日成本")
-                        .font(.caption.weight(.semibold))
-                        .tracking(0.6)
-                        .foregroundStyle(.secondary)
-                    Text(Fmt.usd(snapshot.today.totalCost))
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .tracking(-0.8)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    HStack(spacing: 14) {
-                        SourceChip(source: .claude, text: Fmt.usd(snapshot.today.claude.costUSD))
-                        SourceChip(source: .codex, text: Fmt.usd(snapshot.today.codex.costUSD))
-                    }
-                }
-                Spacer(minLength: 12)
-                VStack(alignment: .leading, spacing: 10) {
-                    quickStat("本月", Fmt.usd(snapshot.monthCost))
-                    quickStat("近 90 天", Fmt.usd(snapshot.totalCost))
-                    if let last = ResetStats.compute(from: snapshot.resets).lastReset {
-                        quickStat("Codex 重置", Fmt.relative(last))
-                    }
-                }
-                .padding(.top, 2)
+    private var costPrimary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TerminalEyebrow(text: "today / estimated cost")
+            Text(Fmt.usd(snapshot.today.totalCost))
+                .font(.system(size: 42, weight: .bold, design: .monospaced))
+                .tracking(-1.4)
+                .foregroundStyle(Palette.signal)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            HStack(spacing: 14) {
+                SourceChip(source: .claude, text: Fmt.usd(snapshot.today.claude.costUSD))
+                SourceChip(source: .codex, text: Fmt.usd(snapshot.today.codex.costUSD))
             }
         }
     }
 
     private func quickStat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .tracking(0.8)
+                .foregroundStyle(Palette.muted)
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Palette.ink)
                 .monospacedDigit()
         }
     }

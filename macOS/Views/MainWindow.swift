@@ -27,9 +27,52 @@ struct MainWindow: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.rawValue, systemImage: item.icon).tag(item)
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text("~/")
+                            .foregroundStyle(Palette.signal)
+                        Text("AIUsage")
+                            .foregroundStyle(Palette.ink)
+                    }
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    Text("LOCAL USAGE METER")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .tracking(1.1)
+                        .foregroundStyle(Palette.muted)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+
+                List(SidebarItem.allCases, selection: $selection) { item in
+                    HStack(spacing: 9) {
+                        Text(selection == item ? ">" : " ")
+                            .foregroundStyle(Palette.signal)
+                        Image(systemName: item.icon)
+                            .frame(width: 16)
+                        Text(item.rawValue)
+                        Spacer()
+                    }
+                    .font(.system(size: 12, weight: selection == item ? .semibold : .regular, design: .monospaced))
+                    .foregroundStyle(selection == item ? Palette.ink : Palette.muted)
+                    .padding(.vertical, 4)
+                    .tag(item)
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(store.serverRunning ? Palette.signal : Palette.warning)
+                        .frame(width: 6, height: 6)
+                    Text(store.serverRunning ? "SYNC SERVER ONLINE" : "SYNC SERVER OFFLINE")
+                }
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+                .padding(14)
             }
+            .background(Palette.canvas)
             .navigationSplitViewColumnWidth(min: 150, ideal: 170)
         } detail: {
             Group {
@@ -46,14 +89,23 @@ struct MainWindow: View {
                 } else {
                     VStack(spacing: 10) {
                         ProgressView()
-                        Text("正在解析本地用量日志…")
-                            .foregroundStyle(.secondary)
+                            .tint(Palette.signal)
+                        Text("> 正在解析本地用量日志…")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(Palette.muted)
                     }
+                    .background(Palette.canvas)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .navigationTitle(selection.rawValue)
+            .background(Palette.canvas)
+            .navigationTitle("")
             .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Text(selection.rawValue.uppercased())
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         store.refresh()
@@ -70,6 +122,7 @@ struct MainWindow: View {
             }
         }
         .task { store.startIfNeeded() }
+        .tint(Palette.signal)
     }
 }
 
@@ -151,6 +204,7 @@ struct SourceDetailView: View {
             }
             .padding(14)
         }
+        .background(Palette.canvas)
     }
 
     @ViewBuilder

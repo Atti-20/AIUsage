@@ -9,6 +9,7 @@ struct AIUsageiOSApp: App {
         WindowGroup {
             IOSRootView()
                 .environmentObject(store)
+                .preferredColorScheme(.dark)
         }
     }
 }

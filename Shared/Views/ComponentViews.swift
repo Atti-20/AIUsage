@@ -10,28 +10,61 @@ struct Card<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let title {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 7) {
+                    Text(">")
+                        .foregroundStyle(Palette.signal)
+                    Text(title.uppercased())
+                        .foregroundStyle(Palette.muted)
+                }
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .tracking(0.8)
             }
             content
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.6), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Palette.line, lineWidth: 1)
         )
     }
+}
 
-    private var cardBackground: Color {
-        #if os(macOS)
-        Color(nsColor: .controlBackgroundColor)
-        #else
-        Color(uiColor: .secondarySystemGroupedBackground)
-        #endif
+struct TerminalEyebrow: View {
+    var text: String
+    var tint: Color = Palette.signal
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Text(">")
+                .foregroundStyle(tint)
+            Text(text.uppercased())
+                .foregroundStyle(Palette.muted)
+        }
+        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+        .tracking(0.9)
+    }
+}
+
+struct StatusPill: View {
+    var text: String
+    var isLive: Bool = true
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(isLive ? Palette.signal : Palette.warning)
+                .frame(width: 6, height: 6)
+                .shadow(color: (isLive ? Palette.signal : Palette.warning).opacity(0.55), radius: 5)
+            Text(text)
+        }
+        .font(.system(size: 10, weight: .medium, design: .monospaced))
+        .foregroundStyle(Palette.muted)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Palette.surfaceRaised, in: Capsule())
+        .overlay(Capsule().strokeBorder(Palette.line, lineWidth: 1))
     }
 }
 
@@ -85,26 +118,55 @@ struct LimitCard: View {
 
     var body: some View {
         Card(title: nil) {
-            HStack(spacing: 14) {
-                RingGauge(percent: window.utilization, tint: Palette.color(for: source))
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 5) {
-                        Circle().fill(Palette.color(for: source)).frame(width: 7, height: 7)
-                        Text("\(source.displayName) · \(window.label)")
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(Palette.color(for: source))
+                            .frame(width: 7, height: 7)
+                        Text("\(source.displayName.uppercased()) / \(window.label)")
                     }
-                    if let resetsAt = window.resetsAt {
-                        Text(Fmt.countdown(to: resetsAt))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text("已用 \(Fmt.percent(window.utilization))")
-                        .font(.caption.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.utilizationText(window.utilization))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Palette.muted)
+                    Spacer()
+                    Text("USED")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
                 }
-                Spacer(minLength: 0)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(Fmt.percent(window.utilization))
+                        .font(.system(size: 34, weight: .bold, design: .monospaced))
+                        .tracking(-1)
+                        .foregroundStyle(Palette.utilizationText(window.utilization))
+                        .monospacedDigit()
+                    Spacer()
+                    if let resetsAt = window.resetsAt {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("RESET IN")
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Palette.muted)
+                            Text(Fmt.countdown(to: resetsAt))
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Palette.ink)
+                                .monospacedDigit()
+                        }
+                    } else {
+                        Text("RESET —")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Palette.muted)
+                    }
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Palette.line)
+                        Capsule()
+                            .fill(Palette.utilizationText(window.utilization))
+                            .frame(width: max(4, geo.size.width * min(max(window.utilization, 0), 100) / 100))
+                    }
+                }
+                .frame(height: 5)
             }
         }
     }
@@ -116,12 +178,12 @@ struct StatCard: View {
     var title: String
     var value: String
     var caption: String?
-    var valueColor: Color = .primary
+    var valueColor: Color = Palette.ink
 
     var body: some View {
         Card(title: title) {
             Text(value)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
                 .tracking(-0.3)
                 .monospacedDigit()
                 .foregroundStyle(valueColor)
@@ -145,10 +207,10 @@ struct SourceChip: View {
         HStack(spacing: 5) {
             Circle().fill(Palette.color(for: source)).frame(width: 7, height: 7)
             Text(source.displayName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Palette.muted)
             Text(text)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
         }
     }

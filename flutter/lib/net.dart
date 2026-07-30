@@ -9,14 +9,18 @@ import 'models.dart';
 class ResetsClient {
   static Future<List<ResetEvent>> fetch() async {
     final resp = await http
-        .get(Uri.parse('https://codex-resets.com/api/resets'), headers: {'accept': 'application/json'})
+        .get(
+          Uri.parse('https://codex-resets.com/api/resets'),
+          headers: {'accept': 'application/json'},
+        )
         .timeout(const Duration(seconds: 15));
     if (resp.statusCode != 200) throw HttpException('HTTP ${resp.statusCode}');
     final root = jsonDecode(utf8.decode(resp.bodyBytes));
-    final events = ((root as Map)['events'] as List? ?? [])
-        .map((e) => ResetEvent.fromJson((e as Map).cast()))
-        .toList()
-      ..sort((a, b) => b.announcedAt.compareTo(a.announcedAt));
+    final events =
+        ((root as Map)['events'] as List? ?? [])
+            .map((e) => ResetEvent.fromJson((e as Map).cast()))
+            .toList()
+          ..sort((a, b) => b.announcedAt.compareTo(a.announcedAt));
     return events;
   }
 }
@@ -24,10 +28,15 @@ class ResetsClient {
 /// Claude 官方限额（Windows/Linux 上凭据是明文文件 ~/.claude/.credentials.json）。
 class ClaudeOAuth {
   static Future<ClaudeLimits> fetch() async {
-    final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.';
+    final home =
+        Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '.';
     final credFile = File('$home/.claude/.credentials.json');
     if (!credFile.existsSync()) {
-      return ClaudeLimits(error: '未找到 Claude Code 登录凭据：安装 Claude Code 并登录后即可显示官方限额');
+      return ClaudeLimits(
+        error: '未找到 Claude Code 登录凭据：安装 Claude Code 并登录后即可显示官方限额',
+      );
     }
     String? token;
     String? subscription;
@@ -42,19 +51,23 @@ class ClaudeOAuth {
     if (token == null) return ClaudeLimits(error: 'Claude 凭据解析失败');
 
     try {
-      final resp = await http.get(
-        Uri.parse('https://api.anthropic.com/api/oauth/usage'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'anthropic-beta': 'oauth-2025-04-20',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final resp = await http
+          .get(
+            Uri.parse('https://api.anthropic.com/api/oauth/usage'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'anthropic-beta': 'oauth-2025-04-20',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
       if (resp.statusCode != 200) {
         return ClaudeLimits(
           subscription: subscription,
           fetchedAt: DateTime.now(),
-          error: resp.statusCode == 401 ? 'Claude 登录令牌已过期，运行一次 claude 即可刷新' : 'Claude 限额接口返回 ${resp.statusCode}',
+          error: resp.statusCode == 401
+              ? 'Claude 登录令牌已过期，运行一次 claude 即可刷新'
+              : 'Claude 限额接口返回 ${resp.statusCode}',
         );
       }
       final root = jsonDecode(resp.body);
@@ -72,9 +85,13 @@ class ClaudeOAuth {
         if (raw == null) continue;
         final percent = raw <= 1.0 ? raw * 100 : raw;
         DateTime? resetsAt;
-        if (w['resets_at'] is String) resetsAt = DateTime.tryParse(w['resets_at'] as String)?.toLocal();
+        if (w['resets_at'] is String) {
+          resetsAt = DateTime.tryParse(w['resets_at'] as String)?.toLocal();
+        }
         if (w['resets_at'] is num) {
-          resetsAt = DateTime.fromMillisecondsSinceEpoch(((w['resets_at'] as num) * 1000).toInt());
+          resetsAt = DateTime.fromMillisecondsSinceEpoch(
+            ((w['resets_at'] as num) * 1000).toInt(),
+          );
         }
         windows.add(LimitWindow(key, label, percent, resetsAt, null));
       }
@@ -85,7 +102,11 @@ class ClaudeOAuth {
         error: windows.isEmpty ? '接口未返回限额窗口' : null,
       );
     } catch (e) {
-      return ClaudeLimits(subscription: subscription, fetchedAt: DateTime.now(), error: 'Claude 限额请求失败');
+      return ClaudeLimits(
+        subscription: subscription,
+        fetchedAt: DateTime.now(),
+        error: 'Claude 限额请求失败',
+      );
     }
   }
 }
@@ -108,7 +129,11 @@ class SnapshotServer {
         server.listen((request) {
           final bytes = utf8.encode(payload);
           request.response
-            ..headers.contentType = ContentType('application', 'json', charset: 'utf-8')
+            ..headers.contentType = ContentType(
+              'application',
+              'json',
+              charset: 'utf-8',
+            )
             ..headers.set('Access-Control-Allow-Origin', '*')
             ..contentLength = bytes.length
             ..add(bytes);
@@ -119,14 +144,19 @@ class SnapshotServer {
     }
     if (_udp == null) {
       try {
-        final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, discoveryPort);
+        final udp = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          discoveryPort,
+        );
         udp.listen((event) {
           if (event != RawSocketEvent.read) return;
           final dg = udp.receive();
           if (dg == null) return;
           final msg = utf8.decode(dg.data, allowMalformed: true);
           if (!msg.startsWith('AIUSAGE_DISCOVER')) return;
-          final reply = utf8.encode('AIUSAGE ${Platform.localHostname} $httpPort');
+          final reply = utf8.encode(
+            'AIUSAGE ${Platform.localHostname} $httpPort',
+          );
           udp.send(reply, dg.address, dg.port);
         });
         _udp = udp;
@@ -140,28 +170,43 @@ class LanClient {
   static Future<UsageSnapshot> fetchManual(String address) async {
     var addr = address.trim();
     if (!addr.contains(':')) addr = '$addr:${SnapshotServer.httpPort}';
-    final resp = await http.get(Uri.parse('http://$addr/snapshot.json')).timeout(const Duration(seconds: 8));
+    final resp = await http
+        .get(Uri.parse('http://$addr/snapshot.json'))
+        .timeout(const Duration(seconds: 8));
     if (resp.statusCode != 200) throw HttpException('HTTP ${resp.statusCode}');
-    return UsageSnapshot.fromJson(jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    return UsageSnapshot.fromJson(
+      jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>,
+    );
   }
 
   /// UDP 广播发现桌面端，返回 "ip:port"；找不到抛异常。
-  static Future<String> discover({Duration timeout = const Duration(seconds: 3)}) async {
+  static Future<String> discover({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
     final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
     socket.broadcastEnabled = true;
     try {
       final probe = utf8.encode('AIUSAGE_DISCOVER');
-      socket.send(probe, InternetAddress('255.255.255.255'), SnapshotServer.discoveryPort);
+      socket.send(
+        probe,
+        InternetAddress('255.255.255.255'),
+        SnapshotServer.discoveryPort,
+      );
 
       final deadline = DateTime.now().add(timeout);
-      await for (final event in socket.timeout(timeout, onTimeout: (sink) => sink.close())) {
+      await for (final event in socket.timeout(
+        timeout,
+        onTimeout: (sink) => sink.close(),
+      )) {
         if (event != RawSocketEvent.read) continue;
         final dg = socket.receive();
         if (dg == null) continue;
         final msg = utf8.decode(dg.data, allowMalformed: true);
         if (msg.startsWith('AIUSAGE ')) {
           final parts = msg.split(' ');
-          final port = parts.length >= 3 ? parts[2] : '${SnapshotServer.httpPort}';
+          final port = parts.length >= 3
+              ? parts[2]
+              : '${SnapshotServer.httpPort}';
           return '${dg.address.address}:$port';
         }
         if (DateTime.now().isAfter(deadline)) break;

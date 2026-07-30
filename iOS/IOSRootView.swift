@@ -18,11 +18,11 @@ struct IOSRootView: View {
                         EmptySyncView()
                     }
                 }
-                .navigationTitle("AI 用量")
+                .navigationTitle("~/AIUsage")
                 .navigationBarTitleDisplayMode(.inline)
                 .refreshable { await store.refresh() }
             }
-            .tabItem { Label("总览", systemImage: "square.grid.2x2") }
+            .tabItem { Label("用量", systemImage: "terminal") }
 
             NavigationStack {
                 ResetsView(events: store.resets)
@@ -39,6 +39,8 @@ struct IOSRootView: View {
             }
             .tabItem { Label("同步", systemImage: "wifi") }
         }
+        .tint(Palette.signal)
+        .toolbarBackground(Palette.canvas, for: .tabBar)
     }
 }
 
@@ -47,12 +49,15 @@ struct SyncBanner: View {
 
     var body: some View {
         Label(text, systemImage: "wifi.exclamationmark")
-            .font(.caption)
-            .foregroundStyle(.orange)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(Palette.warning)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(.orange.opacity(0.1))
+            .padding(.vertical, 8)
+            .background(Palette.warning.opacity(0.08))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Palette.warning.opacity(0.35)).frame(height: 1)
+            }
     }
 }
 
@@ -60,16 +65,34 @@ struct EmptySyncView: View {
     @EnvironmentObject var store: IOSStore
 
     var body: some View {
-        ContentUnavailableView {
-            Label(store.isRefreshing ? "正在寻找 Mac…" : "未连接到 Mac", systemImage: "wifi.router")
-        } description: {
-            Text(store.syncError ?? "在 Mac 上运行「AI 用量」，并让 iPhone 与 Mac 连接同一 Wi-Fi，用量数据会自动同步到这里。")
-        } actions: {
-            Button("重新搜索") {
-                Task { await store.refresh() }
+        ZStack {
+            Palette.canvas.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 18) {
+                TerminalEyebrow(text: "waiting for desktop")
+                Image(systemName: "wifi.router")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(Palette.signal)
+                Text(store.isRefreshing ? "正在寻找 Mac…" : "未连接到 Mac")
+                    .font(.system(size: 25, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Palette.ink)
+                Text(store.syncError ?? "在 Mac 上运行 AIUsage，并让 iPhone 与 Mac 连接同一 Wi-Fi。用量快照会自动同步，原始会话不会离开电脑。")
+                    .font(.callout)
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Task { await store.refresh() }
+                } label: {
+                    Text(store.isRefreshing ? "SEARCHING…" : "> RETRY DISCOVERY")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Palette.signal)
+                .foregroundStyle(Palette.canvas)
+                .disabled(store.isRefreshing)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(store.isRefreshing)
+            .padding(24)
+            .frame(maxWidth: 460)
         }
     }
 }
@@ -132,6 +155,9 @@ struct SyncInfoView: View {
                     .font(.footnote)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Palette.canvas)
+        .tint(Palette.signal)
         .onAppear { addressDraft = store.manualAddress }
     }
 
